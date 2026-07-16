@@ -166,10 +166,11 @@ def index_all(store, projects_dir: Path | None = None, codex_dir: Path | None = 
               gemini_dir: Path | None = None, *, embedder=None, reindex: bool = False) -> dict:
     """Index and sum conversations across all registered agents (Claude Code + Codex CLI + Gemini CLI).
     Each source yields 0 if its directory is absent. Called by `index --source agent`."""
-    from . import claude_recall, codex_recall
+    from . import claude_recall, codex_recall, gemini_recall
     total = {"turns": 0, "files": 0, "skipped": 0}
     for r in (claude_recall.index_claude(store, projects_dir, embedder=embedder, reindex=reindex),
-              codex_recall.index_codex(store, codex_dir, embedder=embedder, reindex=reindex)):
+              codex_recall.index_codex(store, codex_dir, embedder=embedder, reindex=reindex),
+              gemini_recall.index_gemini(store, gemini_dir, embedder=embedder, reindex=reindex)):
         for k in total:
             total[k] += r[k]
     return total
