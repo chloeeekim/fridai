@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+dist/
+build/
+
+# Test / tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+
+# fastembed / model caches (if created inside the repo)
+fastembed_cache/
+.fastembed_cache/
+local_cache/
+
+# Environment
+.env
+.env.*
+.python-version
+
+# IDEs / editors
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+.\#*
+
+# OS
+.DS_Store
+Thumbs.db
