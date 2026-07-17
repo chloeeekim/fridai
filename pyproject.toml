@@ -1,12 +1,32 @@
 [project]
 name = "fridai"
 version = "0.1.0"
-description = "fridai MCP 서버 — 과거 코드·커밋·AI 대화 기록을 100% 로컬에서 회수(검색 전용, 로컬 LLM 불필요)"
+description = "Local MCP server for recalling past code, commits, and AI conversations — search-only, no local LLM required"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
-# numpy(벡터 검색 가속), fastembed(onnx 로컬 임베딩, torch 불필요), mcp(서버 SDK).
+authors = [
+  { name = "Chloe Jungah Kim", email = "hiyaku0317@gmail.com" },
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development",
+]
+# numpy (vector search), fastembed (local ONNX embeddings, no torch), mcp (server SDK).
 dependencies = ["numpy>=1.21", "fastembed>=0.3", "mcp>=1.0"]
+
+[project.urls]
+Homepage = "https://github.com/chloeeekim/fridai"
+Repository = "https://github.com/chloeeekim/fridai"
+Issues = "https://github.com/chloeeekim/fridai/issues"
 
 [project.scripts]
 fridai = "fridai.cli:main"
