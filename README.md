@@ -29,9 +29,8 @@ Search & recall only — **no local LLM required.**
 ## Install
 
 ```bash
-git clone https://github.com/chloeeekim/fridai.git
-cd fridai
-pipx install .            # isolated (recommended). Or: pip install -e .  in a venv
+pipx install fridai        # isolated (recommended)
+# or: pip install fridai   # in a venv
 ```
 
 Pulls `numpy` + `fastembed` (onnx) + `mcp`. Registers the `fridai` command.
@@ -153,8 +152,6 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 CI (GitHub Actions) runs the suite on Python 3.10–3.14 plus a fastembed smoke check on every push/PR.
 Tests are hermetic — `tests/__init__.py` isolates all `FRIDAI_*` paths and disables the embedder,
 so no real `~/.fridai`/`~/.codex`/etc. is touched and no model is downloaded.
-
-See [`docs/build-order.md`](docs/build-order.md) for the design & build-order rationale.
 
 ## License
 

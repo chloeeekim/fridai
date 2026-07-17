@@ -26,9 +26,8 @@
 ## 설치
 
 ```bash
-git clone https://github.com/chloeeekim/fridai.git
-cd fridai
-pipx install .            # 격리 설치(권장). 또는 venv에서 pip install -e .
+pipx install fridai        # 격리 설치(권장)
+# 또는: pip install fridai  # venv에서
 ```
 
 `numpy` + `fastembed`(onnx) + `mcp`가 딸려옵니다. `fridai` 명령이 등록됩니다.
@@ -148,8 +147,6 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 CI(GitHub Actions)가 push/PR마다 Python 3.10–3.14에서 테스트 + fastembed 실동작 스모크를 돌립니다.
 테스트는 격리돼 있어(`tests/__init__.py`가 모든 `FRIDAI_*` 경로를 임시로 두고 임베더를 끔) 실제
 `~/.fridai`·`~/.codex` 등을 건드리지 않고 모델도 받지 않습니다.
-
-설계·구축 순서 근거는 [`docs/build-order.md`](docs/build-order.md) 참고(영문).
 
 ## 라이선스
 
