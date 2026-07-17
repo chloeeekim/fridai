@@ -1,5 +1,9 @@
 # fridai 🛠️
 
+[![PyPI](https://img.shields.io/pypi/v/fridai.svg)](https://pypi.org/project/fridai/)
+[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 *[English](README.md) | 한국어*
 
 코딩 에이전트(Claude Code 등)가 `recall` 툴로 당신의 과거 **코드·커밋·AI 대화 기록**을
