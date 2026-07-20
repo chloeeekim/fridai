@@ -8,6 +8,8 @@ No local LLM / answer generation (search & recall only). Embedding via fastembed
 from __future__ import annotations
 
 import argparse
+import time
+from datetime import datetime
 from pathlib import Path
 
 from .core import config, embeddings
@@ -26,6 +28,39 @@ def _open_store(redact: bool = True) -> Store:
     return store
 
 
+def _run_index(store, source, path, embedder, *, reindex=False, prune=True) -> dict:
+    """Run one indexing pass for the selected source(s). Returns per-source result dicts.
+    Incremental (mtime/hash state), so repeated passes are cheap — used by both one-shot and --watch."""
+    out: dict = {}
+    if source in ("agent", "all"):
+        out["agent"] = agent_recall.index_all(store, embedder=embedder, reindex=reindex)
+    if source in ("code", "all"):
+        out["code"] = code.index_code(path, store, reindex=reindex, embedder=embedder, prune=prune)
+    if source in ("commits", "all"):
+        out["commits"] = commits.index_commits(path, store, reindex=reindex, embedder=embedder)
+    return out
+
+
+def _print_index_result(res: dict) -> None:
+    if "agent" in res:
+        r = res["agent"]
+        print(f"  conversations (Claude+Codex+Gemini): {r['turns']} turns / {r['files']} sessions (skipped {r['skipped']})")
+    if "code" in res:
+        r = res["code"]
+        print(f"  code: {r['chunks']} chunks / {r['files']} files (skipped {r['skipped']}, pruned {r['pruned']})")
+    if "commits" in res:
+        print(f"  commits: {res['commits']['commits']}")
+
+
+def _reindexed_counts(res: dict) -> dict:
+    """What got (re)processed this pass — a 'something changed' signal for --watch."""
+    return {
+        "turns": (res.get("agent") or {}).get("turns", 0),
+        "chunks": (res.get("code") or {}).get("chunks", 0),
+        "commits": (res.get("commits") or {}).get("commits", 0),
+    }
+
+
 def cmd_index(args) -> None:
     valid = ("agent", "code", "commits", "all")
     if args.source not in valid:
@@ -34,22 +69,24 @@ def cmd_index(args) -> None:
     print("secret redaction:", "OFF (--no-redact)" if args.no_redact else "ON")
     embedder = None if args.no_embed else embeddings.get_embedder()
     print("semantic embedding:", "ON (fastembed)" if embedder else "OFF (lexical only)")
-
-    if args.source in ("agent", "all"):
-        r = agent_recall.index_all(store, embedder=embedder, reindex=args.reindex)
-        print(f"  conversations (Claude+Codex+Gemini): {r['turns']} turns / {r['files']} sessions (skipped {r['skipped']})")
-
     path = args.path or "."
-    if args.source in ("code", "all"):
-        r = code.index_code(path, store, reindex=args.reindex, embedder=embedder,
-                            prune=not args.no_prune)
-        print(f"  code: {r['chunks']} chunks / {r['files']} files (skipped {r['skipped']}, pruned {r['pruned']})")
-    if args.source in ("commits", "all"):
-        r = commits.index_commits(path, store, reindex=args.reindex, embedder=embedder)
-        print(f"  commits: {r['commits']}")
-
-    store.close()
-    print(f"Done → {config.DB_PATH}")
+    prune = not args.no_prune
+    try:
+        _print_index_result(_run_index(store, args.source, path, embedder,
+                                       reindex=args.reindex, prune=prune))
+        print(f"Done → {config.DB_PATH}")
+        if args.watch:
+            print(f"👀 watching (interval {args.interval}s, Ctrl-C to stop)")
+            while True:
+                time.sleep(args.interval)
+                n = _reindexed_counts(_run_index(store, args.source, path, embedder, prune=prune))
+                if any(n.values()):
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] reindexed: "
+                          f"+{n['turns']} turns, +{n['chunks']} chunks, +{n['commits']} commits")
+    except KeyboardInterrupt:
+        print("\nstopped.")
+    finally:
+        store.close()
 
 
 def cmd_mcp(args) -> None:
@@ -79,6 +116,8 @@ def build_parser() -> argparse.ArgumentParser:
     ix.add_argument("--no-embed", action="store_true", help="skip embeddings (lexical only)")
     ix.add_argument("--no-prune", action="store_true", help="skip pruning deleted files (code)")
     ix.add_argument("--no-redact", action="store_true", help="turn off secret redaction (default ON)")
+    ix.add_argument("--watch", action="store_true", help="keep reindexing on an interval (Ctrl-C to stop)")
+    ix.add_argument("--interval", type=int, default=15, help="--watch polling interval in seconds (default: 15)")
     ix.set_defaults(func=cmd_index)
 
     mp = sub.add_parser("mcp", help="run the MCP server — agents recall past memory via `recall`")

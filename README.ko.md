@@ -46,6 +46,7 @@ claude mcp add fridai -- fridai mcp   # Claude Code에 등록
 
 등록 후 에이전트가 `recall` 툴로 회수합니다. 언제든 `fridai index`를 다시 돌리면 갱신되는데,
 **증분**(변경된 파일·세션·새 커밋만 재처리)이라 가볍습니다.
+자동으로 최신 유지하려면 `fridai index --watch`(기본 15초마다 재인덱싱, `--interval`로 조정).
 
 ## CLI 레퍼런스
 
@@ -65,6 +66,8 @@ claude mcp add fridai -- fridai mcp   # Claude Code에 등록
 | `--no-embed` | 임베딩 생략(어휘 인덱스만). |
 | `--no-prune` | git에서 삭제된 파일의 청크 유지(code). |
 | `--no-redact` | 시크릿 마스킹 끄기(기본 ON). |
+| `--watch` | Ctrl-C까지 주기적으로 재인덱싱. |
+| `--interval N` | `--watch` 폴링 간격(초, 기본 15). |
 
 ## `recall` 툴 (MCP)
 

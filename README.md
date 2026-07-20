@@ -49,6 +49,7 @@ claude mcp add fridai -- fridai mcp   # register with Claude Code
 
 After registering, the agent recalls via the `recall` tool. Re-run `fridai index` anytime to
 refresh — it's **incremental** (only changed files/sessions/new commits are reprocessed), so it's cheap.
+To keep it fresh automatically, run `fridai index --watch` (reindexes every 15s; `--interval` to change).
 
 ## CLI reference
 
@@ -68,6 +69,8 @@ refresh — it's **incremental** (only changed files/sessions/new commits are re
 | `--no-embed` | Skip embeddings (lexical index only). |
 | `--no-prune` | Keep chunks of files deleted from git (code). |
 | `--no-redact` | Turn off secret masking (on by default). |
+| `--watch` | Keep reindexing on an interval until Ctrl-C. |
+| `--interval N` | `--watch` poll interval in seconds (default 15). |
 
 ## The `recall` tool (MCP)
 
