@@ -1,4 +1,4 @@
-"""Claude Code transcript 파서 테스트. 합성 transcript로 노이즈 필터/추출/증분 검증."""
+"""Claude Code transcript parser tests. A synthetic transcript exercises noise filtering, extraction, and incremental indexing."""
 import json
 import tempfile
 import unittest
@@ -16,7 +16,7 @@ def _write_jsonl(lines: list[dict]) -> Path:
     return Path(f.name)
 
 
-# 진짜질문1 + assistant + tool_result 노이즈 + 이어하기 노이즈 + 진짜질문2 + assistant
+# real question 1 + assistant + tool_result noise + continuation noise + real question 2 + assistant
 SESSION = [
     {"type": "ai-title", "aiTitle": "Fix auth header"},
     {"type": "user", "isMeta": False, "isSidechain": False,
@@ -51,12 +51,12 @@ class TestParse(unittest.TestCase):
 
     def test_only_real_questions_extracted(self):
         self.assertEqual([t.question for t in self.turns],
-                         ["d_ip 헤더 추가하고 싶어", "테스트도 추가해줘"])   # system-reminder 제거·노이즈 제외
+                         ["d_ip 헤더 추가하고 싶어", "테스트도 추가해줘"])   # system-reminder stripped, noise excluded
 
     def test_answer_and_context_captured(self):
         t = self.turns[0]
         self.assertIn("헤더를 추가했습니다", t.answer)
-        self.assertNotIn("생각...", t.answer)              # thinking 제외
+        self.assertNotIn("생각...", t.answer)              # thinking excluded
         self.assertEqual(t.repo, "flower-ad-server")
         self.assertEqual(t.branch, "release/1.0.31")
         self.assertIn("Edit", t.tools)

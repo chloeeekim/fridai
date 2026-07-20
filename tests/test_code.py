@@ -1,4 +1,4 @@
-"""F1 code 인덱싱 단위 테스트. 임시 git 레포 생성 후 검증."""
+"""F1 code indexing unit tests. Create a temporary git repo and verify."""
 import subprocess
 import tempfile
 import unittest
@@ -14,12 +14,12 @@ def _git(repo, *args):
 
 class TestChunking(unittest.TestCase):
     def test_chunk_lines_overlap_and_bounds(self):
-        lines = [f"L{i}" for i in range(1, 151)]  # 150줄
+        lines = [f"L{i}" for i in range(1, 151)]  # 150 lines
         chunks = list(code.chunk_lines(lines, window=60, overlap=15))
-        self.assertEqual(chunks[0][0], 1)            # 첫 청크 시작=1
-        self.assertEqual(chunks[0][1], 60)           # 끝=60
-        self.assertEqual(chunks[-1][1], 150)         # 마지막 청크 끝=총줄수
-        self.assertEqual(chunks[1][0], 46)           # step=45 → 다음 시작 46
+        self.assertEqual(chunks[0][0], 1)            # first chunk starts at 1
+        self.assertEqual(chunks[0][1], 60)           # ends at 60
+        self.assertEqual(chunks[-1][1], 150)         # last chunk ends at total line count
+        self.assertEqual(chunks[1][0], 46)           # step=45 -> next starts at 46
 
     def test_empty_file_no_chunks(self):
         self.assertEqual(list(code.chunk_lines([])), [])
@@ -40,7 +40,7 @@ class TestSymbolChunking(unittest.TestCase):
     def test_python_class_boundary(self):
         src = "class A:\n    def m(self):\n        pass\nclass B:\n    pass".splitlines()
         chunks = list(code.chunk_symbols(src, "python"))
-        # class A(+method) 와 class B 가 분리
+        # class A (+method) and class B are separated
         self.assertTrue(any("class A" in c[2] for c in chunks))
         self.assertTrue(any("class B" in c[2] and "class A" not in c[2] for c in chunks))
 
@@ -55,27 +55,27 @@ class TestSymbolChunking(unittest.TestCase):
     def test_line_numbers_absolute_and_contiguous(self):
         src = ["import a", "", "def f():", "    return 1"]
         chunks = list(code.chunk_symbols(src, "python"))
-        self.assertEqual(chunks[0][0], 1)              # preamble 시작=1
-        self.assertEqual(chunks[-1][1], 4)             # 마지막 끝=총줄수
+        self.assertEqual(chunks[0][0], 1)              # preamble starts at 1
+        self.assertEqual(chunks[-1][1], 4)             # last ends at total line count
 
     def test_unsupported_lang_falls_back_to_windows(self):
         src = [f"line {i}" for i in range(150)]
         sym = list(code.chunk_symbols(src, "text"))
         win = list(code.chunk_lines(src))
-        self.assertEqual(sym, win)                      # 폴백 동일
+        self.assertEqual(sym, win)                      # same as the fallback
 
     def test_large_symbol_subsplit(self):
         src = ["def big():"] + [f"    x{i} = {i}" for i in range(200)]
         chunks = list(code.chunk_symbols(src, "python"))
-        self.assertGreater(len(chunks), 1)              # MAX_UNIT 초과 → 재분할
+        self.assertGreater(len(chunks), 1)              # exceeds MAX_UNIT -> re-split
 
 
 class TestIgnore(unittest.TestCase):
     def test_is_ignored_patterns(self):
         pats = ["*.env", "secrets/", "config/local.py"]
         self.assertTrue(code.is_ignored("app.env", pats))
-        self.assertTrue(code.is_ignored("deep/dir/x.env", pats))      # *.env 하위경로
-        self.assertTrue(code.is_ignored("secrets/key.txt", pats))     # 디렉터리
+        self.assertTrue(code.is_ignored("deep/dir/x.env", pats))      # *.env in a subpath
+        self.assertTrue(code.is_ignored("secrets/key.txt", pats))     # directory
         self.assertTrue(code.is_ignored("config/local.py", pats))
         self.assertFalse(code.is_ignored("src/app.py", pats))
         self.assertFalse(code.is_ignored("config/prod.py", pats))
@@ -93,7 +93,7 @@ class TestIgnore(unittest.TestCase):
             code.index_code(repo, store)
             paths = store.paths("code", repo.name)
             self.assertIn("app.py", paths)
-            self.assertNotIn("secret.env", paths)     # .fridaiignore로 제외
+            self.assertNotIn("secret.env", paths)     # excluded by .fridaiignore
         finally:
             store.close()
 
@@ -105,7 +105,7 @@ class TestRepoIndexing(unittest.TestCase):
         _git(self.repo, "init", "-q")
         (self.repo / "app.py").write_text(
             "\n".join(f"line {i} jwt token refresh" for i in range(150)), encoding="utf-8")
-        (self.repo / "logo.png").write_bytes(b"\x89PNG\x00\x00binary")  # 제외 대상
+        (self.repo / "logo.png").write_bytes(b"\x89PNG\x00\x00binary")  # to be excluded
         _git(self.repo, "add", "-A")
         self.store = Store(":memory:")
 
@@ -123,8 +123,8 @@ class TestRepoIndexing(unittest.TestCase):
 
     def test_index_creates_chunks_and_is_searchable(self):
         res = code.index_code(self.repo, self.store)
-        self.assertEqual(res["files"], 1)          # png 제외, py만
-        self.assertGreater(res["chunks"], 1)       # 150줄 → 여러 청크
+        self.assertEqual(res["files"], 1)          # png excluded, py only
+        self.assertGreater(res["chunks"], 1)       # 150 lines -> multiple chunks
         hits = self.store.search_lexical("jwt")
         self.assertTrue(hits)
         self.assertEqual(hits[0].document.source_type, "code")
@@ -140,7 +140,7 @@ class TestRepoIndexing(unittest.TestCase):
         code.index_code(self.repo, self.store)
         (self.repo / "app.py").write_text("changed content here", encoding="utf-8")
         res = code.index_code(self.repo, self.store)
-        self.assertEqual(res["files"], 1)          # 변경 감지 → 재인덱싱
+        self.assertEqual(res["files"], 1)          # change detected -> reindexed
 
     def test_prune_removes_deleted_file_chunks(self):
         (self.repo / "b.py").write_text("\n".join(f"x{i} = {i}" for i in range(80)),
@@ -148,13 +148,13 @@ class TestRepoIndexing(unittest.TestCase):
         _git(self.repo, "add", "-A")
         code.index_code(self.repo, self.store)
         self.assertIn("b.py", self.store.paths("code", self.repo.name))
-        # b.py 삭제 후 재인덱싱 → b.py 청크가 정리됨
+        # after deleting b.py and reindexing -> b.py chunks are pruned
         (self.repo / "b.py").unlink()
         _git(self.repo, "add", "-A")
         res = code.index_code(self.repo, self.store)
         self.assertEqual(res["pruned"], 1)
         self.assertNotIn("b.py", self.store.paths("code", self.repo.name))
-        self.assertIn("app.py", self.store.paths("code", self.repo.name))   # 남은 파일 유지
+        self.assertIn("app.py", self.store.paths("code", self.repo.name))   # remaining file kept
         self.assertIsNone(self.store.get_state(f"code:{self.repo.name}:b.py"))
 
     def test_no_prune_keeps_stale(self):
@@ -165,7 +165,7 @@ class TestRepoIndexing(unittest.TestCase):
         _git(self.repo, "add", "-A")
         res = code.index_code(self.repo, self.store, prune=False)
         self.assertEqual(res["pruned"], 0)
-        self.assertIn("b.py", self.store.paths("code", self.repo.name))      # 정리 안 함
+        self.assertIn("b.py", self.store.paths("code", self.repo.name))      # not pruned
 
     def test_meta_stores_repo_root(self):
         code.index_code(self.repo, self.store)
@@ -178,7 +178,7 @@ class TestRepoIndexing(unittest.TestCase):
                 return [1.0, 0.0, 0.0]
         code.index_code(self.repo, self.store, embedder=FakeEmbedder())
         hits = self.store.search_vector([1.0, 0.0, 0.0], k=3)
-        self.assertTrue(hits)                       # 벡터가 저장되어 검색됨
+        self.assertTrue(hits)                       # vector stored and searchable
         self.assertEqual(hits[0].document.source_type, "code")
 
 

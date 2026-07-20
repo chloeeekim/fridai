@@ -1,4 +1,4 @@
-"""회수/랭킹(search.py) 단위 테스트 — RRF·작업신호·dedup·citation·retrieve."""
+"""Retrieval/ranking (search.py) unit tests — RRF, work signal, dedup, citation, retrieve."""
 import unittest
 from datetime import datetime, timezone
 
@@ -35,17 +35,17 @@ class TestCitation(unittest.TestCase):
     def test_agent_turn_non_claude_shows_agent_tag(self):
         d = Document(id="t", source_type="agent_turn", repo="r", path="s", title="q",
                      text="t", timestamp=WHEN, meta={"agent": "codex", "session_title": "S"})
-        self.assertIn("[codex]", search.citation(d))   # 비-Claude는 출처 표시
+        self.assertIn("[codex]", search.citation(d))   # non-Claude shows the source tag
 
 
 class TestRRF(unittest.TestCase):
     def test_rewards_agreement(self):
         lex = [_hit("B"), _hit("A"), _hit("C")]
-        vec = [_hit("B"), _hit("A"), _hit("D")]       # B 양쪽 1위, A 양쪽 2위
+        vec = [_hit("B"), _hit("A"), _hit("D")]       # B ranks 1st in both, A 2nd in both
         fused = search.rrf_fuse([lex, vec], k=4)
         self.assertEqual(fused[0].document.id, "B")
         ids = [h.document.id for h in fused]
-        self.assertLess(ids.index("A"), ids.index("C"))  # 양쪽 등장 A > 한쪽 C
+        self.assertLess(ids.index("A"), ids.index("C"))  # in both (A) > in one (C)
 
 
 class TestWorkSignal(unittest.TestCase):
@@ -53,9 +53,9 @@ class TestWorkSignal(unittest.TestCase):
         code = _hit("c", st="code").document
         turn_work = _hit("t1", st="agent_turn", meta={"files": ["a.py"]}).document
         turn_q = _hit("t2", st="agent_turn", meta={"files": [], "commits": []}).document
-        self.assertTrue(search.work_signal(code))          # code=작업물
-        self.assertTrue(search.work_signal(turn_work))     # 파일 편집한 턴
-        self.assertFalse(search.work_signal(turn_q))       # 순수 질문 턴
+        self.assertTrue(search.work_signal(code))          # code = a work artifact
+        self.assertTrue(search.work_signal(turn_work))     # a turn that edited files
+        self.assertFalse(search.work_signal(turn_q))       # a question-only turn
 
     def test_rerank_demotes_question_only_turn(self):
         def turn(i, files):
@@ -74,7 +74,7 @@ class TestDedup(unittest.TestCase):
         out = search.dedup_results(hits)
         ids = [h.document.id for h in out]
         self.assertIn("a", ids)
-        self.assertNotIn("b", ids)      # a와 near-dup → 병합
+        self.assertNotIn("b", ids)      # near-dup of a -> merged
         self.assertIn("c", ids)
 
 
@@ -108,7 +108,7 @@ class TestRetrieve(unittest.TestCase):
             def embed(self, q):
                 return [1.0, 0.0]
         hits = search.retrieve(self.s, "무관한단어", k=3, embedder=FakeEmbedder())
-        self.assertTrue(hits)                          # 어휘론 0건이나 벡터로 회수
+        self.assertTrue(hits)                          # 0 lexical hits, recalled via vector
         self.assertEqual(hits[0].document.id, "v1")
 
 

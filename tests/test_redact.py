@@ -1,4 +1,4 @@
-"""비밀정보 레다션 테스트 — 시크릿은 마스킹, 정상 코드/SHA는 보존."""
+"""Secret redaction tests — mask secrets, preserve normal code/SHAs."""
 import unittest
 
 from fridai.core import redact
@@ -28,28 +28,28 @@ class TestRedactText(unittest.TestCase):
 
     def test_password_kv_masks_value_keeps_key(self):
         out, _ = self._masked('password = "hunter2secret"')
-        self.assertIn("password", out)              # 키는 유지
-        self.assertNotIn("hunter2secret", out)      # 값만 마스킹
+        self.assertIn("password", out)              # key kept
+        self.assertNotIn("hunter2secret", out)      # only the value masked
 
     def test_high_entropy_opt_in_only(self):
-        secret = "Wja7c8KQ2pLZ9xVf3RtBn6MeYh1Ds0Uq4Gi5Ko7"   # base64풍 혼합
+        secret = "Wja7c8KQ2pLZ9xVf3RtBn6MeYh1Ds0Uq4Gi5Ko7"   # base64-like mix
         out_off, _ = redact.redact_text(secret, entropy=False)
-        self.assertEqual(out_off, secret)                     # 기본(OFF)은 안 가림
+        self.assertEqual(out_off, secret)                     # default (OFF) does not mask
         out_on, n = redact.redact_text(secret, entropy=True)
-        self.assertIn("REDACTED:HIGH_ENTROPY", out_on)        # opt-in 시 가림
+        self.assertIn("REDACTED:HIGH_ENTROPY", out_on)        # masked when opted in
         self.assertEqual(n, 1)
 
     def test_camelcase_identifier_not_redacted_by_default(self):
-        # 실제 오탐 사례: 긴 camelCase 식별자(대/소/숫자 혼합 32자+)
+        # real false-positive case: a long camelCase identifier (mixed upper/lower/digits, 32+ chars)
         ident = "maxDownloadBandwidthDeviceSystemInfoV2"
-        out, n = redact.redact_text(ident)                    # 기본 entropy OFF
+        out, n = redact.redact_text(ident)                    # entropy OFF by default
         self.assertEqual(out, ident)
         self.assertEqual(n, 0)
 
-    # ── 오탐 방지 ──
+    # ── false-positive prevention ──
     def test_git_sha_not_redacted(self):
         out, n = self._masked("커밋 a3f9c2b1d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9 에서 고침")
-        self.assertIn("a3f9c2b1d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9", out)  # 소문자 hex SHA 보존
+        self.assertIn("a3f9c2b1d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9", out)  # lowercase hex SHA preserved
         self.assertEqual(n, 0)
 
     def test_normal_code_not_redacted(self):
@@ -73,7 +73,7 @@ class TestRedactDocument(unittest.TestCase):
         self.assertNotIn("AKIAIOSFODNN7EXAMPLE", d.text)
         self.assertNotIn("AKIAIOSFODNN7EXAMPLE", d.title)
         self.assertNotIn("AKIAIOSFODNN7EXAMPLE", d.meta["question"])
-        self.assertEqual(d.meta["files"], ["a.py"])     # 비문자열 meta 보존
+        self.assertEqual(d.meta["files"], ["a.py"])     # non-string meta preserved
 
 
 if __name__ == "__main__":

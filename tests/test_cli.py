@@ -1,4 +1,4 @@
-"""CLI 단위 테스트 — _run_index 인덱싱 패스, watch 델타 카운트, 파서 기본값."""
+"""CLI unit tests — _run_index indexing pass, watch delta counts, parser defaults."""
 import subprocess
 import tempfile
 import unittest
@@ -32,21 +32,21 @@ class TestRunIndex(unittest.TestCase):
         self.assertIn("code", r1)
         self.assertGreater(r1["code"]["chunks"], 0)
         self.assertNotIn("commits", r1)                 # source="code" only
-        # 2차 패스: 변경 없음 → 청크 0(전부 skip)
+        # 2nd pass: nothing changed -> 0 chunks (all skipped)
         r2 = cli._run_index(self.store, "code", str(self.repo), None)
         self.assertEqual(r2["code"]["chunks"], 0)
 
     def test_all_source_runs_every_indexer(self):
         r = cli._run_index(self.store, "all", str(self.repo), None)
         self.assertEqual(set(r), {"agent", "code", "commits"})
-        self.assertEqual(r["commits"]["commits"], 1)     # 초기 커밋 1개
+        self.assertEqual(r["commits"]["commits"], 1)     # 1 initial commit
 
     def test_reindexed_counts_signal(self):
         r = cli._run_index(self.store, "all", str(self.repo), None)
         n = cli._reindexed_counts(r)
         self.assertGreater(n["chunks"], 0)
         self.assertEqual(n["commits"], 1)
-        # 재실행 → 변화 없음 → 전부 0 (watch가 조용해짐)
+        # rerun -> no change -> all 0 (watch stays quiet)
         n2 = cli._reindexed_counts(cli._run_index(self.store, "all", str(self.repo), None))
         self.assertEqual(n2, {"turns": 0, "chunks": 0, "commits": 0})
 
@@ -103,7 +103,7 @@ class TestParser(unittest.TestCase):
     def test_watch_defaults(self):
         a = cli.build_parser().parse_args(["index", "--watch"])
         self.assertTrue(a.watch)
-        self.assertEqual(a.interval, 15)             # 기본 15초
+        self.assertEqual(a.interval, 15)             # default 15s
 
     def test_interval_configurable(self):
         a = cli.build_parser().parse_args(["index", "--watch", "--interval", "30"])

@@ -1,4 +1,4 @@
-"""fastembed 전용 임베더 테스트 (fastembed 미설치여도 통과 — 폴백/식별자 검증)."""
+"""fastembed-only embedder tests (pass even without fastembed installed — fallback/identifier checks)."""
 import os
 import unittest
 
@@ -17,7 +17,7 @@ class TestEmbedder(unittest.TestCase):
         os.environ["FRIDAI_EMBED_BACKEND"] = "none"
         try:
             self.assertIsNone(embeddings.get_embedder())
-        finally:                                   # 전역 격리값을 지우지 않도록 원복
+        finally:                                   # restore so the global isolation value is not cleared
             if prev is None:
                 os.environ.pop("FRIDAI_EMBED_BACKEND", None)
             else:
@@ -27,7 +27,7 @@ class TestEmbedder(unittest.TestCase):
         self.assertTrue(embeddings.FastEmbedEmbedder(model="m").model_id.startswith("fastembed:"))
 
     def test_no_openai_compat_embedder(self):
-        # 로컬 LLM/HTTP 임베더는 fridai에서 제외됨
+        # the local-LLM / HTTP embedder is excluded from fridai
         self.assertFalse(hasattr(embeddings, "OpenAICompatEmbedder"))
 
     def test_embed_documents_with_injected_embedder(self):

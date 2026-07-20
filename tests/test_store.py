@@ -1,4 +1,4 @@
-"""Store(sqlite+FTS5) 단위 테스트. stdlib unittest."""
+"""Store (sqlite+FTS5) unit tests. stdlib unittest."""
 import unittest
 from datetime import datetime, timezone
 
@@ -30,7 +30,7 @@ class TestStore(unittest.TestCase):
 
     def test_upsert_is_idempotent(self):
         d = _doc("t", "x")
-        self.s.upsert([d]); self.s.upsert([d])   # 같은 id 두 번
+        self.s.upsert([d]); self.s.upsert([d])   # same id twice
         self.assertEqual(self.s.stats()["total"], 1)
 
     def test_lexical_search_finds_and_filters(self):
@@ -41,14 +41,14 @@ class TestStore(unittest.TestCase):
         hits = self.s.search_lexical("마운트")
         self.assertEqual(len(hits), 1)
         self.assertEqual(hits[0].document.title, "도커 마운트")
-        # repo 필터
+        # repo filter
         self.assertEqual(len(self.s.search_lexical("추가", repo="r2")), 1)
 
     def test_lexical_empty_query(self):
         self.assertEqual(self.s.search_lexical("   "), [])
 
     def test_vector_search_dim_mismatch_returns_empty(self):
-        # 저장 벡터(3dim)와 쿼리(2dim) 불일치 → 크래시 없이 빈 결과(어휘 폴백 유도)
+        # stored vector (3-dim) vs query (2-dim) mismatch -> empty result without a crash (drives lexical fallback)
         self.s.upsert([_doc("a", "x", emb=[1.0, 0.0, 0.0])])
         self.assertEqual(self.s.search_vector([1.0, 0.0], k=3), [])
 
@@ -58,7 +58,7 @@ class TestStore(unittest.TestCase):
             _doc("b", "y", emb=[0.0, 1.0, 0.0]),
         ])
         hits = self.s.search_vector([0.9, 0.1, 0.0], k=2)
-        self.assertEqual(hits[0].document.title, "a")  # 첫 벡터에 더 가까움
+        self.assertEqual(hits[0].document.title, "a")  # closer to the first vector
 
     def test_recent_orders_oldest_to_newest(self):
         older = _doc("older", "x", ts=datetime(2026, 1, 1, tzinfo=timezone.utc))
@@ -98,7 +98,7 @@ class TestStore(unittest.TestCase):
         self.assertEqual(removed, 1)
         self.assertIsNone(self.s.get("code:1"))
         self.assertIsNotNone(self.s.get("code:2"))
-        # fts/vectors도 함께 정리되어 검색에 안 잡힘
+        # fts/vectors are cleaned up too, so it no longer shows up in search
         self.assertEqual(self.s.search_lexical("x"), [])
 
     def test_index_state_roundtrip(self):
@@ -120,14 +120,14 @@ class TestStore(unittest.TestCase):
             Document(id="c3", source_type="code", repo="r", path="b.py", title="t", text="z"),
             Document(id="n1", source_type="note", repo="r", path="note", title="t", text="w"),
         ])
-        self.assertEqual(self.s.paths("code", "r"), {"a.py", "b.py"})  # distinct, note 제외
+        self.assertEqual(self.s.paths("code", "r"), {"a.py", "b.py"})  # distinct, note excluded
 
 
 class TestVectorMigration(unittest.TestCase):
     def test_migrates_vec_json_to_blob_without_reembed(self):
         import json, sqlite3, tempfile, os
         path = os.path.join(tempfile.mkdtemp(), "old.db")
-        # 구버전 스키마(vec_json) 모사 + 문서/벡터 1건
+        # emulate the old schema (vec_json) + one document/vector
         con = sqlite3.connect(path)
         con.executescript(
             "CREATE TABLE documents(id TEXT PRIMARY KEY, source_type TEXT, repo TEXT, path TEXT,"
@@ -136,7 +136,7 @@ class TestVectorMigration(unittest.TestCase):
         con.execute("INSERT INTO documents VALUES('d1','code','r','p','t','x',NULL,'{}')")
         con.execute("INSERT INTO vectors VALUES('d1', ?)", (json.dumps([1.0, 0.0, 0.0]),))
         con.commit(); con.close()
-        # Store 열면 자동 마이그레이션 → 벡터 검색 동작(재임베딩 없이)
+        # opening Store auto-migrates -> vector search works (without re-embedding)
         s = Store(path)
         try:
             cols = [r[1] for r in s.con.execute("PRAGMA table_info(vectors)")]
@@ -169,7 +169,7 @@ class TestRedactionIntegration(unittest.TestCase):
             s.close()
 
     def test_rescan_redact_cleans_existing(self):
-        s = Store(":memory:", redact=False)            # 원문으로 먼저 저장
+        s = Store(":memory:", redact=False)            # store the raw text first
         try:
             s.upsert([_doc("키", "secret AKIAIOSFODNN7EXAMPLE 노출")])
             changed = s.rescan_redact()
@@ -186,7 +186,7 @@ class TestHelpers(unittest.TestCase):
         self.assertAlmostEqual(_cosine([1, 0], [0, 1]), 0.0)
 
     def test_fts_match_prefix_and_sanitizes(self):
-        # 특수문자 제거 + 토큰별 접두 매칭(한국어 조사 대응)
+        # strip special characters + per-token prefix matching (handles Korean particles)
         self.assertEqual(_fts_match("도커 마운트"), '"도커"* OR "마운트"*')
         self.assertEqual(_fts_match("a (b) c!"), '"a"* OR "b"* OR "c"*')
 
@@ -194,7 +194,7 @@ class TestHelpers(unittest.TestCase):
         s = Store(":memory:")
         try:
             s.upsert([_doc("t", "S3 마운트는 efs 설치로 해결")])
-            self.assertTrue(s.search_lexical("마운트"))  # "마운트는"을 접두로 매칭
+            self.assertTrue(s.search_lexical("마운트"))  # matches "마운트는" as a prefix
         finally:
             s.close()
 

@@ -1,4 +1,4 @@
-"""F1 commit 인덱싱 단위 테스트. 임시 git 레포에 실제 커밋 생성."""
+"""F1 commit indexing unit tests. Create real commits in a temporary git repo."""
 import subprocess
 import tempfile
 import unittest
@@ -9,8 +9,9 @@ from fridai.core.store import Store
 
 
 def _git(repo, *args):
-    # 임시 레포는 개발자의 전역 git 설정(예: commit.gpgsign=true, 회사 서명키)에
-    # 의존하지 않도록 서명을 끄고 신원을 명시 → 어느 환경에서도 재현 가능.
+    # Disable signing and set an explicit identity so the temp repo does not depend on
+    # the developer's global git config (e.g. commit.gpgsign=true, a company signing key)
+    # -> reproducible on any environment.
     subprocess.run(["git", "-C", str(repo), "-c", "user.email=t@t.io",
                     "-c", "user.name=tester", "-c", "commit.gpgsign=false",
                     *args], capture_output=True, check=True)
@@ -43,7 +44,7 @@ class TestCommitIndexing(unittest.TestCase):
         doc = hits[0].document
         self.assertEqual(doc.source_type, "commit")
         self.assertEqual(doc.title, "fix: mount path bug")
-        self.assertIn("b.txt", doc.text)        # 변경 파일이 본문에 포함
+        self.assertIn("b.txt", doc.text)        # changed file included in the body
 
     def test_incremental_skips_when_head_unchanged(self):
         commits.index_commits(self.repo, self.store)
@@ -66,7 +67,7 @@ class TestCommitIndexing(unittest.TestCase):
                              capture_output=True, text=True).stdout.strip()
         out = commits.changes(self.repo, sha)
         self.assertIsNotNone(out)
-        self.assertIn("b.txt", out)        # 마지막 커밋이 건드린 파일
+        self.assertIn("b.txt", out)        # file touched by the last commit
 
     def test_changes_truncates(self):
         sha = subprocess.run(["git", "-C", str(self.repo), "rev-parse", "HEAD"],

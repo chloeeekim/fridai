@@ -1,6 +1,7 @@
-"""F4 확장(#84) — Codex CLI rollout 파서 + 증분 인덱싱 단위 테스트.
+"""F4 extension (#84) — Codex CLI rollout parser + incremental indexing unit tests.
 
-픽스처는 문서/리버스 엔지니어링으로 파악한 rollout 스키마를 재현(실 Codex 데이터 검증은 별도).
+The fixture reproduces the rollout schema learned from docs/reverse engineering
+(validation against real Codex data is done separately).
 """
 import json
 import tempfile
@@ -10,15 +11,15 @@ from pathlib import Path
 from fridai.core.sources import codex_recall as cx
 from fridai.core.store import Store
 
-# rollout-*.jsonl 한 세션 (codex-cli 0.143 실 스키마 반영):
-# session_meta(cwd) + developer(제외) + user환경블록(노이즈) + 실제 user 질문 2개
-# + exec_command(셸, 파일추출X) + apply_patch(path 키 → 파일추출O) + assistant 답변
+# one rollout-*.jsonl session (matching the codex-cli 0.143 real schema):
+# session_meta(cwd) + developer(excluded) + user environment block(noise) + 2 real user questions
+# + exec_command(shell, no file extraction) + apply_patch(path key -> file extracted) + assistant answers
 SESSION = [
     {"timestamp": "2026-07-01T10:00:00Z", "type": "session_meta",
      "payload": {"session_id": "s1", "cwd": "/home/u/myrepo",
                  "model_provider": "openai", "cli_version": "0.143.0"}},
     {"timestamp": "2026-07-01T10:00:01Z", "type": "turn_context",
-     "payload": {"turn_id": "t1", "cwd": "/home/u/myrepo"}},          # 무시돼야 함
+     "payload": {"turn_id": "t1", "cwd": "/home/u/myrepo"}},          # should be ignored
     {"timestamp": "2026-07-01T10:00:01Z", "type": "response_item",
      "payload": {"type": "message", "role": "developer",
                  "content": [{"type": "input_text", "text": "<permissions instructions>..."}]}},
@@ -32,7 +33,7 @@ SESSION = [
     {"timestamp": "2026-07-01T10:00:05Z", "type": "response_item",
      "payload": {"type": "function_call", "name": "exec_command",
                  "arguments": "{\"cmd\":\"grep -r 401 src\",\"workdir\":\"/home/u/myrepo\"}", "call_id": "c1"}},
-    {"timestamp": "2026-07-01T10:00:06Z", "type": "event_msg",           # 무시돼야 함
+    {"timestamp": "2026-07-01T10:00:06Z", "type": "event_msg",           # should be ignored
      "payload": {"type": "agent_message", "message": "..."}},
     {"timestamp": "2026-07-01T10:00:07Z", "type": "response_item",
      "payload": {"type": "message", "role": "assistant",
@@ -64,7 +65,7 @@ class TestParse(unittest.TestCase):
         self.turns = cx.parse_session(_write_session(SESSION))
 
     def test_extracts_only_real_user_turns(self):
-        # developer(지시문)·<environment_context> 주입 블록은 제외, 실제 질문 2개만
+        # developer(instructions) and injected <environment_context> blocks excluded; only 2 real questions
         self.assertEqual([t.question for t in self.turns],
                          ["왜 로그인이 401 나지?", "그럼 그 직전엔?"])
 
@@ -73,15 +74,15 @@ class TestParse(unittest.TestCase):
         self.assertIn("헤더 누락", self.turns[1].answer)
 
     def test_meta_cwd_from_session_meta(self):
-        self.assertEqual(self.turns[0].repo, "myrepo")     # session_meta.cwd → repo
+        self.assertEqual(self.turns[0].repo, "myrepo")     # session_meta.cwd -> repo
 
     def test_exec_command_yields_no_file(self):
-        # 셸 도구는 파일 경로가 구조화돼 있지 않음 → 도구명만, 파일 없음
+        # shell tools have no structured file path -> tool name only, no files
         self.assertIn("exec_command", self.turns[0].tools)
         self.assertEqual(self.turns[0].files, [])
 
     def test_path_keyed_tool_extracts_file(self):
-        # apply_patch 처럼 path 계열 키가 있는 도구는 파일 추출됨
+        # tools with a path-like key (e.g. apply_patch) do extract files
         self.assertIn("apply_patch", self.turns[1].tools)
         self.assertIn("src/auth.py", self.turns[1].files)
 
@@ -105,7 +106,7 @@ class TestHelpers(unittest.TestCase):
 class TestIndex(unittest.TestCase):
     def setUp(self):
         self.session = _write_session(SESSION)
-        self.root = self.session.parents[2]      # …/2026 의 부모 = sessions 루트
+        self.root = self.session.parents[2]      # parent of …/2026 = sessions root
         self.store = Store(":memory:")
 
     def tearDown(self):
@@ -116,7 +117,7 @@ class TestIndex(unittest.TestCase):
         self.assertEqual(r1["files"], 1)
         self.assertEqual(r1["turns"], 2)
         r2 = cx.index_codex(self.store, self.root)
-        self.assertEqual(r2["skipped"], 1)        # mtime 동일 → skip
+        self.assertEqual(r2["skipped"], 1)        # same mtime -> skip
 
     def test_agent_tagged_codex(self):
         cx.index_codex(self.store, self.root)
@@ -132,7 +133,7 @@ class TestIndex(unittest.TestCase):
 class TestIndexAll(unittest.TestCase):
     def test_aggregates_claude_and_codex(self):
         from fridai.core.sources import agent_recall as ar
-        # Claude 세션 1개
+        # one Claude session
         proj = Path(tempfile.mkdtemp())
         with (proj / "s.jsonl").open("w", encoding="utf-8") as f:
             f.write(json.dumps({"type": "user", "isSidechain": False,
@@ -141,7 +142,7 @@ class TestIndexAll(unittest.TestCase):
             f.write(json.dumps({"type": "assistant", "timestamp": "2026-07-01T09:00:01Z",
                                 "message": {"content": [{"type": "text", "text": "답"}]}}) + "\n")
         codex_root = _write_session(SESSION).parents[2]
-        gemini_root = Path(tempfile.mkdtemp())           # 빈 dir → gemini 0건(실 ~/.gemini 격리)
+        gemini_root = Path(tempfile.mkdtemp())           # empty dir -> 0 gemini (real ~/.gemini isolated)
         store = Store(":memory:")
         try:
             r = ar.index_all(store, proj, codex_root, gemini_root)

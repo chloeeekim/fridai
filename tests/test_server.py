@@ -1,4 +1,4 @@
-"""MCP recall 툴 로직 테스트 (SDK 불필요 — 순수 로직만)."""
+"""MCP recall tool logic tests (no SDK needed — pure logic only)."""
 import unittest
 from datetime import datetime, timedelta, timezone
 
@@ -26,7 +26,7 @@ class TestRecallTool(unittest.TestCase):
     def test_returns_results_with_citations(self):
         out = server.recall_tool("JWT", store=self.store)
         self.assertIn("memory item", out)
-        self.assertIn("Q: JWT 만료 어떻게?", out)         # 질문 원문(데이터)은 그대로
+        self.assertIn("Q: JWT 만료 어떻게?", out)         # the original question (data) is kept as-is
         self.assertIn("refresh로 재발급", out)
         self.assertIn("commit abc1234", out)
 
@@ -80,7 +80,7 @@ class TestSince(unittest.TestCase):
         try:
             out = server.recall_tool("docker mount", store=s, repo="all", since="7d")
             self.assertIn("b.py", out)
-            self.assertNotIn("a.py", out)        # 30일 전 문서는 since=7d로 제외
+            self.assertNotIn("a.py", out)        # a 30-day-old doc is excluded by since=7d
         finally:
             s.close()
 
@@ -98,7 +98,7 @@ class TestEmptyIndex(unittest.TestCase):
         s.upsert([Document(id="c", source_type="code", repo="r", path="p", title="t", text="hello")])
         try:
             out = server.recall_tool("zzznomatchzzz", store=s, repo="all")
-            self.assertIn("no relevant memory", out)   # 비어있음이 아니라 매치 없음
+            self.assertIn("no relevant memory", out)   # not empty — just no match
             self.assertNotIn("index is empty", out)
         finally:
             s.close()

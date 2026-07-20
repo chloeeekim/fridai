@@ -1,4 +1,4 @@
-"""자립형 인덱싱 → 회수 e2e (LLM 없이). Codex·Gemini 세션을 인덱싱하고 recall로 회수."""
+"""Self-contained indexing -> recall e2e (no LLM). Index Codex/Gemini sessions and recall them."""
 import json
 import tempfile
 import unittest
@@ -24,7 +24,7 @@ def _codex_dir() -> Path:
     ]
     p = d / "rollout-2026-07-01T10-00-00-abc.jsonl"
     p.write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
-    return p.parents[2]        # sessions 루트
+    return p.parents[2]        # sessions root
 
 
 def _gemini_dir() -> Path:
@@ -40,13 +40,13 @@ def _gemini_dir() -> Path:
     ]
     (proj / "chats" / "session-2026-07-02T09-00-x.jsonl").write_text(
         "\n".join(json.dumps(r) for r in rows), encoding="utf-8")
-    return proj.parents[0]     # tmp 루트
+    return proj.parents[0]     # tmp root
 
 
 class TestIndexAndRecall(unittest.TestCase):
     def setUp(self):
         self.store = Store(":memory:")
-        self.no_claude = Path(tempfile.mkdtemp()) / "none"   # 존재하지 않는 Claude 경로
+        self.no_claude = Path(tempfile.mkdtemp()) / "none"   # nonexistent Claude path
 
     def tearDown(self):
         self.store.close()
@@ -54,7 +54,7 @@ class TestIndexAndRecall(unittest.TestCase):
     def test_index_all_then_recall(self):
         r = agent_recall.index_all(self.store, self.no_claude, _codex_dir(), _gemini_dir())
         self.assertEqual(r["turns"], 2)           # codex 1 + gemini 1
-        # 출처 에이전트 태깅
+        # source agent tagging
         cx = self.store.search_lexical("도커 마운트", k=3)
         self.assertEqual(cx[0].document.meta.get("agent"), "codex")
         gm = self.store.search_lexical("인증", k=3)

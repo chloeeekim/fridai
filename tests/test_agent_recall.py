@@ -1,5 +1,5 @@
-"""공용 베이스(agent_recall) 테스트 — 파서 무관 기능: _clean·summarize·link_commits·
-turn_to_document·index_sessions(엔진)·index_all(합산)."""
+"""Shared base (agent_recall) tests — parser-agnostic behavior: _clean, summarize,
+link_commits, turn_to_document, index_sessions (engine), index_all (aggregation)."""
 import json
 import subprocess
 import tempfile
@@ -55,21 +55,21 @@ class TestLinkCommits(unittest.TestCase):
         _git(repo, "commit", "-q", "-m", "fix: token refresh")
         iso = subprocess.run(["git", "-C", str(repo), "log", "-1", "--format=%cI"],
                              capture_output=True, text=True).stdout.strip()
-        return repo, datetime.fromisoformat(iso.replace("Z", "+00:00"))  # 3.10 호환
+        return repo, datetime.fromisoformat(iso.replace("Z", "+00:00"))  # 3.10 compat
 
     def test_file_match_commit_linked(self):
         repo, ctime = self._repo_with_commit()
         t = ar.Turn(question="q", when=ctime, cwd=str(repo), files=["Auth.kt"])
         ar.link_commits(t)
         self.assertEqual(len(t.commits), 1)
-        self.assertEqual(t.commits[0][2], "file")            # 파일 일치
+        self.assertEqual(t.commits[0][2], "file")            # file match
         self.assertIn("token refresh", t.commits[0][1])
 
     def test_time_proximity_fallback(self):
         repo, ctime = self._repo_with_commit()
         t = ar.Turn(question="q", when=ctime, cwd=str(repo), files=["other.txt"])
         ar.link_commits(t)
-        self.assertEqual(t.commits[0][2], "time")            # 파일 불일치 → 시간근접
+        self.assertEqual(t.commits[0][2], "time")            # no file match -> time proximity
 
 
 class TestTurnToDocument(unittest.TestCase):
@@ -107,10 +107,10 @@ class TestIndexSessions(unittest.TestCase):
         r1 = ar.index_sessions(self.store, [self.path], self._parse,
                                agent="codex", state_prefix="codex")
         self.assertEqual((r1["files"], r1["turns"]), (1, 2))
-        # agent 태깅 + state_prefix 키
+        # agent tagging + state_prefix key
         self.assertEqual(self.store.search_lexical("도커")[0].document.meta["agent"], "codex")
         self.assertIsNotNone(self.store.get_state(f"codex:{self.path}"))
-        # 2차: mtime 동일 → skip
+        # 2nd pass: same mtime -> skip
         r2 = ar.index_sessions(self.store, [self.path], self._parse,
                                agent="codex", state_prefix="codex")
         self.assertEqual(r2["skipped"], 1)
@@ -124,7 +124,7 @@ class TestIndexSessions(unittest.TestCase):
 
 class TestIndexAll(unittest.TestCase):
     def test_empty_dirs_sum_to_zero(self):
-        # 세 에이전트 모듈을 실제로 import·호출하고 합산하는지(디렉터리 없으면 0)
+        # verify it actually imports/calls all three agent modules and sums them (0 if dirs absent)
         store = Store(":memory:")
         empty = Path(tempfile.mkdtemp())
         try:

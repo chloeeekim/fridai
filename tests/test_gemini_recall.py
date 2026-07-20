@@ -1,6 +1,7 @@
-"""F4 확장(#85) — Gemini CLI chats JSONL 파서 + 증분 인덱싱 단위 테스트.
+"""F4 extension (#85) — Gemini CLI chats JSONL parser + incremental indexing unit tests.
 
-픽스처는 gemini-cli 0.50 실 스키마 재현(헤더 줄 + 메시지 레코드 줄 + <session_context> 노이즈).
+The fixture reproduces the gemini-cli 0.50 real schema (a header line + message
+record lines + <session_context> noise).
 """
 import json
 import tempfile
@@ -53,7 +54,7 @@ class TestParse(unittest.TestCase):
         self.turns = gm.parse_session(_write_session(HEADER, MESSAGES))
 
     def test_only_real_user_questions(self):
-        # <session_context> 주입·info·error 제외, 실제 질문 2개만
+        # injected <session_context>, info, error excluded; only 2 real questions
         self.assertEqual([t.question for t in self.turns],
                          ["이 레포 무슨 프로젝트야?", "README 고쳐줘"])
 
@@ -62,7 +63,7 @@ class TestParse(unittest.TestCase):
         self.assertIn("수정했습니다", self.turns[1].answer)
 
     def test_cwd_from_project_root(self):
-        self.assertEqual(self.turns[0].repo, "myrepo")     # .project_root → cwd → repo
+        self.assertEqual(self.turns[0].repo, "myrepo")     # .project_root -> cwd -> repo
         self.assertEqual(self.turns[0].cwd, "/home/u/myrepo")
 
     def test_toolcalls_yield_tools_and_files(self):
@@ -71,21 +72,21 @@ class TestParse(unittest.TestCase):
         self.assertIn("/home/u/myrepo/README.md", self.turns[1].files)
 
     def test_header_and_noninformative_lines_skipped(self):
-        # 헤더 줄(content 없음)은 턴을 만들지 않음
+        # the header line (no content) does not create a turn
         self.assertEqual(len(self.turns), 2)
 
 
 class TestProjectRootFallback(unittest.TestCase):
     def test_falls_back_to_dir_name_without_project_root(self):
-        p = _write_session(HEADER, MESSAGES, cwd=None)     # .project_root 없음
+        p = _write_session(HEADER, MESSAGES, cwd=None)     # no .project_root
         turns = gm.parse_session(p)
-        self.assertEqual(turns[0].repo, "myrepo")          # 디렉터리 이름으로 폴백
+        self.assertEqual(turns[0].repo, "myrepo")          # falls back to the directory name
 
 
 class TestIndex(unittest.TestCase):
     def setUp(self):
         self.session = _write_session(HEADER, MESSAGES)
-        self.root = self.session.parents[2]      # …/tmp 루트(= myrepo 의 부모)
+        self.root = self.session.parents[2]      # …/tmp root (= parent of myrepo)
         self.store = Store(":memory:")
 
     def tearDown(self):
@@ -104,13 +105,13 @@ class TestIndex(unittest.TestCase):
         self.assertEqual(hits[0].document.meta.get("agent"), "gemini")
 
     def test_nested_checkpoint_excluded(self):
-        # chats/<sessionId>/<uuid>.jsonl (중첩 체크포인트)은 글롭에서 제외 → 중복 인덱싱 안 함
+        # chats/<sessionId>/<uuid>.jsonl (nested checkpoints) are excluded by the glob -> no duplicate indexing
         nested = self.session.parent / "s-uuid"
         nested.mkdir()
         (nested / "cp.jsonl").write_text(
             json.dumps(HEADER) + "\n" + json.dumps(MESSAGES[1]) + "\n", encoding="utf-8")
         r = gm.index_gemini(self.store, self.root)
-        self.assertEqual(r["files"], 1)          # 중첩 파일은 안 셈
+        self.assertEqual(r["files"], 1)          # nested file not counted
 
     def test_missing_dir(self):
         self.assertEqual(gm.index_gemini(self.store, Path("/no/such/dir")),
