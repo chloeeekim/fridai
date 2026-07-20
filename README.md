@@ -49,7 +49,8 @@ claude mcp add fridai -- fridai mcp   # register with Claude Code
 
 After registering, the agent recalls via the `recall` tool. Re-run `fridai index` anytime to
 refresh — it's **incremental** (only changed files/sessions/new commits are reprocessed), so it's cheap.
-To keep it fresh automatically, run `fridai index --watch` (reindexes every 15s; `--interval` to change).
+To keep it fresh automatically, run `fridai index --watch` (reindexes every 15s; `--interval` to change),
+or `fridai install-hook` to reindex on every git commit (no running process needed).
 
 ## CLI reference
 
@@ -58,6 +59,7 @@ To keep it fresh automatically, run `fridai index --watch` (reindexes every 15s;
 | `fridai index` | Build/update the index. |
 | `fridai mcp` | Run the stdio MCP server. |
 | `fridai stats` | Print document counts by source. |
+| `fridai install-hook` | Install a git post-commit hook that reindexes on each commit. |
 
 `index` flags:
 

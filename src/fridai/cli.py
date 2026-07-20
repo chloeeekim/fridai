@@ -104,6 +104,33 @@ def cmd_stats(args) -> None:
     print("Embedding (semantic):", "ON" if embeddings.get_embedder() else "OFF (lexical search)")
 
 
+_HOOK_MARKER = "# fridai-auto-reindex"
+
+
+def cmd_install_hook(args) -> None:
+    """Install a git post-commit hook that reindexes on each commit (no running process needed)."""
+    repo = Path(args.path or ".").resolve()
+    gitdir = repo / ".git"
+    if not gitdir.is_dir():
+        raise SystemExit(f"Not a git repo: {repo}")
+    hooks = gitdir / "hooks"
+    hooks.mkdir(exist_ok=True)
+    hook = hooks / "post-commit"
+    if hook.exists() and not args.force:
+        if _HOOK_MARKER not in hook.read_text(encoding="utf-8", errors="replace"):
+            raise SystemExit(
+                f"A post-commit hook already exists (not fridai's). Use --force to overwrite: {hook}")
+    hook.write_text(
+        "#!/bin/sh\n"
+        f"{_HOOK_MARKER} — installed by `fridai install-hook`\n"
+        f'fridai index --source {args.source} --path "{repo}" >/dev/null 2>&1 || true\n',
+        encoding="utf-8",
+    )
+    hook.chmod(0o755)
+    print(f"✅ post-commit hook installed: {hook}")
+    print(f"   `fridai index --source {args.source}` will now run on every commit.")
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="fridai",
                                  description="fridai MCP server — recall past code/commits/AI conversations (search-only)")
@@ -125,6 +152,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     st = sub.add_parser("stats", help="index overview")
     st.set_defaults(func=cmd_stats)
+
+    ih = sub.add_parser("install-hook", help="install a git post-commit hook that reindexes on each commit")
+    ih.add_argument("--path", help="target repo (default: current dir)")
+    ih.add_argument("--source", default="all", help="what the hook indexes (default: all)")
+    ih.add_argument("--force", action="store_true", help="overwrite an existing post-commit hook")
+    ih.set_defaults(func=cmd_install_hook)
     return ap
 
 

@@ -51,6 +51,44 @@ class TestRunIndex(unittest.TestCase):
         self.assertEqual(n2, {"turns": 0, "chunks": 0, "commits": 0})
 
 
+class TestInstallHook(unittest.TestCase):
+    def setUp(self):
+        self.repo = Path(tempfile.mkdtemp())
+        _git(self.repo, "init", "-q")
+        self.parser = cli.build_parser()
+
+    def _run(self, *extra):
+        args = self.parser.parse_args(["install-hook", "--path", str(self.repo), *extra])
+        args.func(args)
+
+    def test_installs_executable_hook_with_marker(self):
+        self._run()
+        hook = self.repo / ".git" / "hooks" / "post-commit"
+        self.assertTrue(hook.exists())
+        self.assertTrue(hook.stat().st_mode & 0o111)          # executable
+        content = hook.read_text()
+        self.assertIn(cli._HOOK_MARKER, content)
+        self.assertIn(str(self.repo), content)
+        self.assertIn("fridai index", content)
+
+    def test_idempotent_on_own_hook(self):
+        self._run(); self._run()                              # own marker present → OK to overwrite
+        self.assertTrue((self.repo / ".git/hooks/post-commit").exists())
+
+    def test_refuses_foreign_hook_without_force(self):
+        hook = self.repo / ".git" / "hooks" / "post-commit"
+        hook.write_text("#!/bin/sh\necho mine\n")
+        with self.assertRaises(SystemExit):
+            self._run()
+        self._run("--force")                                  # --force overwrites
+        self.assertIn(cli._HOOK_MARKER, hook.read_text())
+
+    def test_not_a_repo_errors(self):
+        args = self.parser.parse_args(["install-hook", "--path", tempfile.mkdtemp()])
+        with self.assertRaises(SystemExit):
+            args.func(args)
+
+
 class TestParser(unittest.TestCase):
     def test_watch_defaults(self):
         a = cli.build_parser().parse_args(["index", "--watch"])

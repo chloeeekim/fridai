@@ -46,7 +46,8 @@ claude mcp add fridai -- fridai mcp   # Claude Code에 등록
 
 등록 후 에이전트가 `recall` 툴로 회수합니다. 언제든 `fridai index`를 다시 돌리면 갱신되는데,
 **증분**(변경된 파일·세션·새 커밋만 재처리)이라 가볍습니다.
-자동으로 최신 유지하려면 `fridai index --watch`(기본 15초마다 재인덱싱, `--interval`로 조정).
+자동으로 최신 유지하려면 `fridai index --watch`(기본 15초마다 재인덱싱, `--interval`로 조정),
+또는 `fridai install-hook`으로 커밋마다 재인덱싱(별도 프로세스 불필요).
 
 ## CLI 레퍼런스
 
@@ -55,6 +56,7 @@ claude mcp add fridai -- fridai mcp   # Claude Code에 등록
 | `fridai index` | 인덱스 생성/갱신. |
 | `fridai mcp` | stdio MCP 서버 실행. |
 | `fridai stats` | 소스별 문서 수 출력. |
+| `fridai install-hook` | 커밋마다 재인덱싱하는 git post-commit 훅 설치. |
 
 `index` 플래그:
 
