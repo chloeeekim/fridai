@@ -6,11 +6,25 @@ agent is the LLM, so this only returns evidence). Reuses the embedder abstractio
 """
 from __future__ import annotations
 
+import re
 import subprocess
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .core import config, embeddings, search
 from .core.store import Store
+
+
+def _parse_since(s: str | None):
+    """Relative time to a UTC cutoff: '7d' / '24h' / '2w'. None/invalid -> None (no filter)."""
+    if not s:
+        return None
+    m = re.fullmatch(r"(\d+)\s*([dhw])", s.strip())
+    if not m:
+        return None
+    n, u = int(m.group(1)), m.group(2)
+    delta = {"d": timedelta(days=n), "h": timedelta(hours=n), "w": timedelta(weeks=n)}[u]
+    return datetime.now(timezone.utc) - delta
 
 
 def _cwd_repo() -> str | None:
@@ -56,16 +70,19 @@ def _format_hit(doc, idx: int) -> str:
 
 def recall_tool(query_text: str, k: int = 5, repo: str | None = None,
                 source_type: str | None = None, store: Store | None = None,
-                cwd_repo: str | None = None) -> str:
+                cwd_repo: str | None = None, since: str | None = None) -> str:
     """Recall past memory -> text with sources (the agent reads and reasons over it).
     Scope: without `repo`, limited to cwd_repo (current repo); repo="all" = everything.
-    Without `store`, uses the default index."""
+    `since` (e.g. "7d"/"24h"/"2w") limits to recent memory. Without `store`, uses the default index."""
     eff_repo = _resolve_repo(repo, cwd_repo)
     own = store is None
     store = store or Store(config.DB_PATH)
     try:
+        if store.stats()["total"] == 0:
+            return "fridai: the index is empty — run `fridai index` first."
         hits = search.retrieve(store, query_text, k=k, embedder=embeddings.get_embedder(),
-                              repo=eff_repo, source_type=source_type or None)
+                              repo=eff_repo, source_type=source_type or None,
+                              since=_parse_since(since))
     finally:
         if own:
             store.close()
@@ -87,7 +104,7 @@ def serve() -> None:
     server = FastMCP("fridai")
 
     @server.tool()
-    def recall(query: str, k: int = 5, repo: str = "", source_type: str = "") -> str:
+    def recall(query: str, k: int = 5, repo: str = "", source_type: str = "", since: str = "") -> str:
         """Recall the developer's past code, commits, AI conversations, and saved notes — with sources (personal coding memory).
 
         **For questions that recall past work, call this BEFORE grepping code/git history:**
@@ -100,8 +117,10 @@ def serve() -> None:
           terms over long sentences. If results are weak, retry with synonyms/related terms.
           (The index mixes natural-language conversations with English code.)
         Scope (repo): empty = current working repo (default). Use repo="all" for cross-repo, or repo="<name>" for a specific repo.
-        source_type (empty = all): agent_turn | code | commit | note."""
+        source_type (empty = all): agent_turn | code | commit | note.
+        since (empty = all time): limit to recent memory, e.g. "7d", "24h", "2w"."""
         return recall_tool(query, k=k, repo=repo or None,
-                           source_type=source_type or None, cwd_repo=_cwd_repo())
+                           source_type=source_type or None, since=since or None,
+                           cwd_repo=_cwd_repo())
 
     server.run()

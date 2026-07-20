@@ -1,6 +1,6 @@
 """MCP recall 툴 로직 테스트 (SDK 불필요 — 순수 로직만)."""
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fridai import server
 from fridai.core.models import Document
@@ -58,6 +58,50 @@ class TestRecallTool(unittest.TestCase):
         self.assertNotIn("beta", out)
         out_all = server.recall_tool("공통키워드", store=self.store, cwd_repo="repoA", repo="all")
         self.assertIn("all repos", out_all)
+
+
+class TestSince(unittest.TestCase):
+    def test_parse_since(self):
+        now = datetime.now(timezone.utc)
+        self.assertIsNone(server._parse_since(None))
+        self.assertIsNone(server._parse_since("nonsense"))
+        d = server._parse_since("7d")
+        self.assertAlmostEqual((now - d).total_seconds(), 7 * 86400, delta=60)
+
+    def test_since_filters_old_out(self):
+        s = Store(":memory:")
+        now = datetime.now(timezone.utc)
+        s.upsert([
+            Document(id="old", source_type="code", repo="r", path="a.py", title="a",
+                     text="docker mount old", timestamp=now - timedelta(days=30)),
+            Document(id="new", source_type="code", repo="r", path="b.py", title="b",
+                     text="docker mount new", timestamp=now - timedelta(days=1)),
+        ])
+        try:
+            out = server.recall_tool("docker mount", store=s, repo="all", since="7d")
+            self.assertIn("b.py", out)
+            self.assertNotIn("a.py", out)        # 30일 전 문서는 since=7d로 제외
+        finally:
+            s.close()
+
+
+class TestEmptyIndex(unittest.TestCase):
+    def test_empty_index_message(self):
+        s = Store(":memory:")
+        try:
+            self.assertIn("index is empty", server.recall_tool("anything", store=s))
+        finally:
+            s.close()
+
+    def test_nonempty_no_match_is_not_empty_message(self):
+        s = Store(":memory:")
+        s.upsert([Document(id="c", source_type="code", repo="r", path="p", title="t", text="hello")])
+        try:
+            out = server.recall_tool("zzznomatchzzz", store=s, repo="all")
+            self.assertIn("no relevant memory", out)   # 비어있음이 아니라 매치 없음
+            self.assertNotIn("index is empty", out)
+        finally:
+            s.close()
 
 
 if __name__ == "__main__":
