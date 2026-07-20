@@ -89,6 +89,16 @@ class TestInstallHook(unittest.TestCase):
             args.func(args)
 
 
+class TestVersion(unittest.TestCase):
+    def test_version_flag_exits_zero(self):
+        with self.assertRaises(SystemExit) as cm:
+            cli.build_parser().parse_args(["--version"])
+        self.assertEqual(cm.exception.code, 0)
+
+    def test_pkg_version_is_str(self):
+        self.assertIsInstance(cli._pkg_version(), str)
+
+
 class TestParser(unittest.TestCase):
     def test_watch_defaults(self):
         a = cli.build_parser().parse_args(["index", "--watch"])

@@ -10,11 +10,19 @@ from __future__ import annotations
 import argparse
 import time
 from datetime import datetime
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from .core import config, embeddings
 from .core.store import Store
 from .core.sources import agent_recall, code, commits
+
+
+def _pkg_version() -> str:
+    try:
+        return version("fridai")
+    except PackageNotFoundError:
+        return "0.0.0+local"
 
 
 def _open_store(redact: bool = True) -> Store:
@@ -134,6 +142,7 @@ def cmd_install_hook(args) -> None:
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="fridai",
                                  description="fridai MCP server — recall past code/commits/AI conversations (search-only)")
+    ap.add_argument("--version", action="version", version=f"fridai {_pkg_version()}")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     ix = sub.add_parser("index", help="index sources (code/commits/AI conversations)")
