@@ -257,7 +257,14 @@ class Store:
             "SELECT source_type, COUNT(*) FROM documents GROUP BY source_type").fetchall())
         by_repo = dict(self.con.execute(
             "SELECT repo, COUNT(*) FROM documents GROUP BY repo").fetchall())
-        return {"total": total, "by_type": by_type, "by_repo": by_repo}
+        # agent_turn docs broken down by source agent (meta['agent']: claude/codex/gemini)
+        by_agent = dict(self.con.execute(
+            "SELECT json_extract(meta_json, '$.agent'), COUNT(*) FROM documents "
+            "WHERE source_type='agent_turn' AND json_extract(meta_json, '$.agent') IS NOT NULL "
+            "GROUP BY 1").fetchall())
+        last_indexed = self.con.execute("SELECT MAX(ts) FROM documents").fetchone()[0]
+        return {"total": total, "by_type": by_type, "by_repo": by_repo,
+                "by_agent": by_agent, "last_indexed": last_indexed}
 
     def delete_by_path(self, source_type: str, repo: str, path: str) -> int:
         """Remove all existing documents for a given file/path (cleanup before re-chunking)."""

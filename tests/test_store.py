@@ -73,6 +73,21 @@ class TestStore(unittest.TestCase):
         self.assertEqual(st["total"], 2)
         self.assertEqual(st["by_type"]["commit"], 1)
 
+    def test_stats_by_agent_and_last_indexed(self):
+        def turn(title, agent, ts):
+            return Document(id=make_id("agent_turn", title), source_type="agent_turn",
+                            repo="r", path="p", title=title, text="x", timestamp=ts,
+                            meta={"agent": agent})
+        self.s.upsert([
+            turn("c1", "claude", datetime(2026, 1, 1, tzinfo=timezone.utc)),
+            turn("c2", "claude", datetime(2026, 3, 1, tzinfo=timezone.utc)),
+            turn("g1", "gemini", datetime(2026, 5, 1, tzinfo=timezone.utc)),
+            _doc("code1", "y", st="code"),        # non-agent doc: absent from by_agent
+        ])
+        st = self.s.stats()
+        self.assertEqual(st["by_agent"], {"claude": 2, "gemini": 1})
+        self.assertTrue(st["last_indexed"].startswith("2026-05-01"))  # MAX(ts)
+
     def test_delete_by_path(self):
         d1 = Document(id="code:1", source_type="code", repo="r", path="a.py",
                       title="a", text="x", embedding=[1.0, 0.0])

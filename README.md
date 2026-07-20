@@ -58,7 +58,7 @@ or `fridai install-hook` to reindex on every git commit (no running process need
 | :--- | :--- |
 | `fridai index` | Build/update the index. |
 | `fridai mcp` | Run the stdio MCP server. |
-| `fridai stats` | Print document counts by source. |
+| `fridai stats` | Print document counts by source, a per-agent conversation breakdown, and when the index was last updated. |
 | `fridai install-hook` | Install a git post-commit hook that reindexes on each commit. |
 
 `index` flags:

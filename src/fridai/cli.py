@@ -109,6 +109,14 @@ def cmd_stats(args) -> None:
     print(f"\nTotal documents: {st['total']}")
     if st["by_type"]:
         print("By source:", ", ".join(f"{k}={v}" for k, v in st["by_type"].items()))
+    if st.get("by_agent"):
+        print("  conversations by agent:", ", ".join(f"{k}={v}" for k, v in st["by_agent"].items()))
+    if st.get("last_indexed"):
+        try:
+            when = datetime.fromisoformat(st["last_indexed"]).astimezone().strftime("%Y-%m-%d %H:%M")
+        except ValueError:
+            when = st["last_indexed"]
+        print("Last indexed:", when)
     print("Embedding (semantic):", "ON" if embeddings.get_embedder() else "OFF (lexical search)")
 
 
