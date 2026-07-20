@@ -15,39 +15,13 @@ Turn / commit-matching / Document conversion / incremental engine are shared fro
 from __future__ import annotations
 
 import json
-from datetime import datetime
 from pathlib import Path
 
 from .. import config
 from . import agent_recall
-from .agent_recall import Turn
+from .agent_recall import Turn, _clean, _files_from_args, _text, _ts
 
 _NOISE_PREFIXES = ("<session_context>", "<environment_context>")
-_FILE_KEYS = ("path", "file_path", "filename", "notebook_path", "dir_path", "absolute_path")
-
-
-def _ts(s):
-    if not s:
-        return None
-    try:
-        return datetime.fromisoformat(str(s).replace("Z", "+00:00"))
-    except ValueError:
-        return None
-
-
-def _text(content) -> str:
-    if isinstance(content, str):
-        return content.strip()
-    if not isinstance(content, list):
-        return ""
-    return "\n".join(b.get("text", "") for b in content
-                     if isinstance(b, dict) and b.get("text")).strip()
-
-
-def _files_from_args(args) -> list[str]:
-    if not isinstance(args, dict):
-        return []
-    return [args[k] for k in _FILE_KEYS if isinstance(args.get(k), str)]
 
 
 def _project_root(chats_file: Path) -> str:
@@ -80,7 +54,7 @@ def parse_session(path: Path) -> list[Turn]:
             when = _ts(rec.get("timestamp"))
             text = _text(rec.get("content"))
             if typ == "user":
-                q = agent_recall._clean(text)
+                q = _clean(text)
                 if not q or q.startswith(_NOISE_PREFIXES):
                     continue
                 if cur:

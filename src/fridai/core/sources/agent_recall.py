@@ -11,6 +11,7 @@ Each parser turns session files into a list of `Turn` and reuses the shared mach
 """
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 from dataclasses import dataclass, field
@@ -41,6 +42,42 @@ def _clean(text: str) -> str:
     text = re.sub(r"<system-reminder>.*?</system-reminder>", "", text, flags=re.DOTALL)
     text = re.sub(r"<task-notification>.*?</task-notification>", "", text, flags=re.DOTALL)
     return text.strip()
+
+
+# ── shared parsing helpers (used by claude/codex/gemini parsers) ──
+_FILE_KEYS = ("path", "file_path", "filename", "notebook_path", "dir_path", "absolute_path")
+
+
+def _ts(s):
+    """Parse an ISO timestamp; 'Z' suffix supported on all versions (3.11+ needs normalizing)."""
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _text(content) -> str:
+    """Text from a message `content` that is either a plain string or a [{type, text}] array."""
+    if isinstance(content, str):
+        return content.strip()
+    if not isinstance(content, list):
+        return ""
+    return "\n".join(b.get("text", "") for b in content
+                     if isinstance(b, dict) and b.get("text")).strip()
+
+
+def _files_from_args(args) -> list[str]:
+    """Best-effort file paths from a tool-call args dict or JSON string (path-like keys only)."""
+    if isinstance(args, str):
+        try:
+            args = json.loads(args)
+        except (ValueError, TypeError):
+            return []
+    if not isinstance(args, dict):
+        return []
+    return [args[k] for k in _FILE_KEYS if isinstance(args.get(k), str)]
 
 
 # ── question -> resulting-commit matching ──
