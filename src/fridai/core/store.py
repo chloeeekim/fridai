@@ -266,6 +266,36 @@ class Store:
         return {"total": total, "by_type": by_type, "by_repo": by_repo,
                 "by_agent": by_agent, "last_indexed": last_indexed}
 
+    def forget_repo(self, repo: str) -> dict:
+        """Remove every document for a repo (+ its FTS/vector rows) and the repo-scoped
+        incremental state (code/commits), so a later `fridai index` restores it cleanly.
+        Agent-turn state is keyed per session file, not per repo — those turns come back
+        only on `fridai index --reindex`. Returns {documents, states}."""
+        ids = [r[0] for r in self.con.execute(
+            "SELECT id FROM documents WHERE repo=?", (repo,)).fetchall()]
+        for did in ids:
+            self.con.execute("DELETE FROM documents WHERE id=?", (did,))
+            self.con.execute("DELETE FROM documents_fts WHERE id=?", (did,))
+            self.con.execute("DELETE FROM vectors WHERE doc_id=?", (did,))
+        prefix, commits_key = f"code:{repo}:", f"commits:{repo}"
+        keys = [r[0] for r in self.con.execute("SELECT key FROM index_state").fetchall()
+                if r[0].startswith(prefix) or r[0] == commits_key]
+        for k in keys:
+            self.con.execute("DELETE FROM index_state WHERE key=?", (k,))
+        self.con.commit()
+        return {"documents": len(ids), "states": len(keys)}
+
+    def reset(self) -> int:
+        """Wipe the entire index — documents, FTS, vectors, and all incremental state.
+        Fully re-buildable with `fridai index` (source data on disk is untouched).
+        Returns the number of documents removed."""
+        n = self.con.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
+        self.con.executescript(
+            "DELETE FROM documents; DELETE FROM documents_fts; "
+            "DELETE FROM vectors; DELETE FROM index_state;")
+        self.con.commit()
+        return n
+
     def delete_by_path(self, source_type: str, repo: str, path: str) -> int:
         """Remove all existing documents for a given file/path (cleanup before re-chunking)."""
         ids = [r[0] for r in self.con.execute(

@@ -101,6 +101,38 @@ class TestStore(unittest.TestCase):
         # fts/vectors are cleaned up too, so it no longer shows up in search
         self.assertEqual(self.s.search_lexical("x"), [])
 
+    def test_forget_repo_removes_docs_state_and_leaves_others(self):
+        self.s.upsert([
+            Document(id="code:1", source_type="code", repo="gone", path="a.py",
+                     title="a", text="alpha", embedding=[1.0, 0.0]),
+            Document(id="cm:1", source_type="commit", repo="gone", path="sha", title="c", text="beta"),
+            Document(id="code:2", source_type="code", repo="keep", path="b.py", title="b", text="gamma"),
+        ])
+        self.s.set_state("code:gone:a.py", "h1")
+        self.s.set_state("commits:gone", "head1")
+        self.s.set_state("code:keep:b.py", "h2")          # unrelated repo state stays
+        r = self.s.forget_repo("gone")
+        self.assertEqual(r, {"documents": 2, "states": 2})
+        self.assertIsNone(self.s.get("code:1"))
+        self.assertIsNone(self.s.get("cm:1"))
+        self.assertIsNotNone(self.s.get("code:2"))         # other repo untouched
+        self.assertEqual(self.s.search_lexical("alpha"), [])   # fts/vectors cleaned
+        self.assertIsNone(self.s.get_state("code:gone:a.py"))
+        self.assertIsNone(self.s.get_state("commits:gone"))
+        self.assertEqual(self.s.get_state("code:keep:b.py"), "h2")
+
+    def test_forget_repo_unknown_is_zero(self):
+        self.assertEqual(self.s.forget_repo("nope"), {"documents": 0, "states": 0})
+
+    def test_reset_wipes_everything(self):
+        self.s.upsert([_doc("t", "hello", emb=[1.0, 0.0])])
+        self.s.set_state("code:r:x", "h")
+        n = self.s.reset()
+        self.assertEqual(n, 1)
+        self.assertEqual(self.s.stats()["total"], 0)
+        self.assertEqual(self.s.search_lexical("hello"), [])
+        self.assertIsNone(self.s.get_state("code:r:x"))
+
     def test_index_state_roundtrip(self):
         self.assertIsNone(self.s.get_state("k"))
         self.s.set_state("k", "v1")
