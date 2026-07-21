@@ -133,6 +133,38 @@ class TestMcpConfig(unittest.TestCase):
         self.assertIn("claude mcp add fridai", buf.getvalue())   # returned without starting stdio server
 
 
+class TestNote(unittest.TestCase):
+    def _parse(self, *argv):
+        return cli.build_parser().parse_args(["note", *argv])
+
+    def test_empty_note_errors(self):
+        with self.assertRaises(SystemExit):
+            cli.cmd_note(self._parse(""))
+
+    def test_repo_and_global_mutually_exclusive(self):
+        with self.assertRaises(SystemExit):
+            cli.cmd_note(self._parse("hi", "--repo", "r", "--global"))
+
+    def test_note_saved_and_recallable(self):
+        import contextlib
+        import io
+        from fridai.core import config
+        from fridai.core.store import Store
+        Store(config.DB_PATH).reset()                      # isolated temp home (tests/__init__)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            cli.cmd_note(self._parse("멱등키 TTL은 5분", "--repo", "pay", "--no-embed"))
+        self.assertIn("note saved to repo 'pay'", buf.getvalue())
+        s = Store(config.DB_PATH)
+        try:
+            hits = s.search_lexical("멱등키", k=5)
+            self.assertTrue(hits)
+            self.assertEqual(hits[0].document.source_type, "note")
+        finally:
+            s.reset()
+            s.close()
+
+
 class TestStats(unittest.TestCase):
     def test_stats_prints_by_repo_sorted_desc(self):
         import contextlib

@@ -1,8 +1,9 @@
-"""MCP server — agents recall past memory directly while coding.
+"""MCP server — agents recall and record memory directly while coding.
 
-**Search-only**: exposes just the `recall` tool (no answer generation — the calling
-agent is the LLM, so this only returns evidence). Reuses the embedder abstraction
-(fastembed if available for semantic, else lexical). The MCP SDK is a dependency.
+Exposes two tools: `recall` (search past memory) and `remember` (save a durable note).
+No answer generation — the calling agent is the LLM, so `recall` only returns evidence.
+Reuses the embedder abstraction (fastembed if available for semantic, else lexical).
+The MCP SDK is a dependency.
 """
 from __future__ import annotations
 
@@ -12,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .core import config, embeddings, search
+from .core.sources import notes
 from .core.store import Store
 
 
@@ -94,6 +96,26 @@ def recall_tool(query_text: str, k: int = 5, repo: str | None = None,
     return "\n\n".join(out)
 
 
+def remember_tool(text: str, repo: str | None = None, store: Store | None = None,
+                  cwd_repo: str | None = None) -> str:
+    """Persist a durable note to memory -> a confirmation string.
+    Scope: without `repo`, attaches to cwd_repo (current repo) so recall finds it by
+    default. Without `store`, uses the default index. Redaction/embedding apply on save."""
+    text = (text or "").strip()
+    if not text:
+        return "fridai: nothing to remember (the note is empty)."
+    eff_repo = repo if repo else (cwd_repo or "")
+    own = store is None
+    store = store or Store(config.DB_PATH)
+    try:
+        doc = notes.add_note(store, text, repo=eff_repo, embedder=embeddings.get_embedder())
+    finally:
+        if own:
+            store.close()
+    scope = f"repo={eff_repo}" if eff_repo else "all repos (global)"
+    return f'fridai: remembered ({scope}) — "{doc.title}"'
+
+
 def serve() -> None:
     """Run the stdio MCP server. Invoked by `fridai mcp`."""
     try:
@@ -122,5 +144,17 @@ def serve() -> None:
         return recall_tool(query, k=k, repo=repo or None,
                            source_type=source_type or None, since=since or None,
                            cwd_repo=_cwd_repo())
+
+    @server.tool()
+    def remember(text: str, repo: str = "") -> str:
+        """Save a durable memory note to the developer's personal coding memory (retrievable later via `recall`).
+
+        **Call this when something is worth remembering across sessions:** a decision and its rationale
+        (why an approach was chosen over alternatives), a non-obvious gotcha or constraint, or a fix for a
+        recurring problem. Prefer distilled, self-contained notes over raw transcript — write what a future
+        session would need to know, including the *why*.
+        This writes to persistent storage, so only save things genuinely worth keeping (not transient status).
+        Scope (repo): empty = the current working repo (default, so `recall` finds it there); repo="<name>" pins it to a specific repo."""
+        return remember_tool(text, repo=repo or None, cwd_repo=_cwd_repo())
 
     server.run()

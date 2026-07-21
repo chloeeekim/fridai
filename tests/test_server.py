@@ -104,5 +104,33 @@ class TestEmptyIndex(unittest.TestCase):
             s.close()
 
 
+class TestRememberTool(unittest.TestCase):
+    def test_remember_then_recall_roundtrip(self):
+        s = Store(":memory:")
+        try:
+            out = server.remember_tool("결제 재시도는 3회로 제한", store=s, cwd_repo="pay")
+            self.assertIn("remembered (repo=pay)", out)
+            hits = server.recall_tool("재시도", store=s, cwd_repo="pay")
+            self.assertIn("memory item", hits)               # the note is recallable in its repo
+        finally:
+            s.close()
+
+    def test_repo_arg_overrides_cwd(self):
+        s = Store(":memory:")
+        try:
+            server.remember_tool("크로스 노트", store=s, repo="other", cwd_repo="here")
+            self.assertEqual(s.search_lexical("크로스")[0].document.repo, "other")
+        finally:
+            s.close()
+
+    def test_empty_note_is_rejected(self):
+        s = Store(":memory:")
+        try:
+            self.assertIn("nothing to remember", server.remember_tool("   ", store=s))
+            self.assertEqual(s.stats()["total"], 0)
+        finally:
+            s.close()
+
+
 if __name__ == "__main__":
     unittest.main()
