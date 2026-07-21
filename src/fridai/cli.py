@@ -147,6 +147,9 @@ def cmd_stats(args) -> None:
     print(f"\nTotal documents: {st['total']}")
     if st["by_type"]:
         print("By source:", ", ".join(f"{k}={v}" for k, v in st["by_type"].items()))
+    if st.get("by_repo"):
+        items = sorted(st["by_repo"].items(), key=lambda kv: -kv[1])
+        print("By repo:", ", ".join(f"{k or '(none)'}={v}" for k, v in items))
     if st.get("by_agent"):
         print("  conversations by agent:", ", ".join(f"{k}={v}" for k, v in st["by_agent"].items()))
     if st.get("last_indexed"):
