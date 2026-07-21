@@ -133,6 +133,36 @@ class TestMcpConfig(unittest.TestCase):
         self.assertIn("claude mcp add fridai", buf.getvalue())   # returned without starting stdio server
 
 
+class TestForget(unittest.TestCase):
+    def _parse(self, *argv):
+        return cli.build_parser().parse_args(["forget", *argv])
+
+    def test_requires_exactly_one_target(self):
+        with self.assertRaises(SystemExit):
+            cli.cmd_forget(self._parse())                 # neither --repo nor --all
+        with self.assertRaises(SystemExit):
+            cli.cmd_forget(self._parse("--repo", "r", "--all"))   # both
+
+    def test_forget_repo_reports_removal(self):
+        import contextlib
+        import io
+        from fridai.core import config
+        from fridai.core.models import Document
+        from fridai.core.store import Store
+        s = Store(config.DB_PATH)                          # isolated temp home (tests/__init__)
+        s.reset()
+        s.upsert([Document(id="code:x", source_type="code", repo="proj",
+                           path="a.py", title="a", text="hello world")])
+        s.close()
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            cli.cmd_forget(self._parse("--repo", "proj"))
+        self.assertIn("forgot repo 'proj'", buf.getvalue())
+        s = Store(config.DB_PATH)
+        self.assertEqual(s.stats()["total"], 0)
+        s.close()
+
+
 class TestParser(unittest.TestCase):
     def test_watch_defaults(self):
         a = cli.build_parser().parse_args(["index", "--watch"])

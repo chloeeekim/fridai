@@ -56,6 +56,7 @@ claude mcp add fridai -- fridai mcp   # Claude Code에 등록
 | `fridai index` | 인덱스 생성/갱신. |
 | `fridai mcp` | stdio MCP 서버 실행. |
 | `fridai stats` | 소스별 문서 수, 에이전트별 대화 분해, 마지막 인덱싱 시각 출력. |
+| `fridai forget` | 특정 레포 기억 삭제(`--repo NAME`) 또는 인덱스 전체 초기화(`--all`). `fridai index` 로 재생성 가능. |
 | `fridai install-hook` | 커밋마다 재인덱싱하는 git post-commit 훅 설치. |
 
 `index` 플래그:

@@ -3,6 +3,7 @@
   fridai index [--source all|code|commits|agent] [--path DIR]
   fridai mcp [--print-config [--client claude|gemini|codex]]   # MCP server
   fridai stats
+  fridai forget (--repo NAME | --all)
 No local LLM / answer generation (search & recall only). Embedding via fastembed.
 """
 from __future__ import annotations
@@ -157,6 +158,27 @@ def cmd_stats(args) -> None:
     print("Embedding (semantic):", "ON" if embeddings.get_embedder() else "OFF (lexical search)")
 
 
+def cmd_forget(args) -> None:
+    """Remove one repo's memory, or reset the whole index (re-buildable with `fridai index`)."""
+    if args.all == bool(args.repo):        # neither or both
+        raise SystemExit("forget: specify exactly one of --repo <name> or --all")
+    store = _open_store()
+    try:
+        if args.all:
+            n = store.reset()
+            print(f"🗑️  reset — removed {n} document(s); the index is now empty.")
+        else:
+            r = store.forget_repo(args.repo)
+            if r["documents"] == 0:
+                print(f"forget: nothing indexed for repo '{args.repo}' "
+                      "(check names with `fridai stats`).")
+            else:
+                print(f"🗑️  forgot repo '{args.repo}' — removed {r['documents']} document(s)"
+                      f" and {r['states']} incremental-state entr(ies).")
+    finally:
+        store.close()
+
+
 _HOOK_MARKER = "# fridai-auto-reindex"
 
 
@@ -210,6 +232,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     st = sub.add_parser("stats", help="index overview")
     st.set_defaults(func=cmd_stats)
+
+    fg = sub.add_parser("forget", help="remove one repo's memory, or reset the whole index")
+    fg.add_argument("--repo", help="repo name to forget (see `fridai stats` for names)")
+    fg.add_argument("--all", action="store_true",
+                    help="wipe the entire index (re-buildable with `fridai index`)")
+    fg.set_defaults(func=cmd_forget)
 
     ih = sub.add_parser("install-hook", help="install a git post-commit hook that reindexes on each commit")
     ih.add_argument("--path", help="target repo (default: current dir)")
