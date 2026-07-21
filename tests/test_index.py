@@ -52,7 +52,8 @@ class TestIndexAndRecall(unittest.TestCase):
         self.store.close()
 
     def test_index_all_then_recall(self):
-        r = agent_recall.index_all(self.store, self.no_claude, _codex_dir(), _gemini_dir())
+        r = agent_recall.index_all(self.store, {"claude": self.no_claude,
+                                                "codex": _codex_dir(), "gemini": _gemini_dir()})
         self.assertEqual(r["turns"], 2)           # codex 1 + gemini 1
         # source agent tagging
         cx = self.store.search_lexical("도커 마운트", k=3)

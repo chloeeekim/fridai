@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from fridai.core.sources import agent_recall as ar
 from fridai.core.sources import claude_recall as cr
 from fridai.core.store import Store
 
@@ -95,23 +96,23 @@ class TestIncrementalIndex(unittest.TestCase):
         self.store.close()
 
     def test_first_run_indexes_then_skips(self):
-        r1 = cr.index_claude(self.store, self.projects)
+        r1 = ar.index_adapter(self.store, cr.ADAPTER, self.projects)
         self.assertEqual(r1["files"], 1)
         self.assertEqual(r1["turns"], 2)
-        r2 = cr.index_claude(self.store, self.projects)
+        r2 = ar.index_adapter(self.store, cr.ADAPTER, self.projects)
         self.assertEqual(r2["files"], 0)
         self.assertEqual(r2["skipped"], 1)
 
     def test_reindex_flag_forces(self):
-        cr.index_claude(self.store, self.projects)
-        self.assertEqual(cr.index_claude(self.store, self.projects, reindex=True)["files"], 1)
+        ar.index_adapter(self.store, cr.ADAPTER, self.projects)
+        self.assertEqual(ar.index_adapter(self.store, cr.ADAPTER, self.projects, reindex=True)["files"], 1)
 
     def test_missing_dir(self):
-        self.assertEqual(cr.index_claude(self.store, Path("/no/such/dir")),
+        self.assertEqual(ar.index_adapter(self.store, cr.ADAPTER, Path("/no/such/dir")),
                          {"turns": 0, "files": 0, "skipped": 0})
 
     def test_agent_tagged_claude(self):
-        cr.index_claude(self.store, self.projects)
+        ar.index_adapter(self.store, cr.ADAPTER, self.projects)
         hits = self.store.search_lexical("헤더", k=5)
         self.assertTrue(hits)
         self.assertEqual(hits[0].document.meta.get("agent"), "claude")

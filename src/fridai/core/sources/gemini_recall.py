@@ -18,8 +18,7 @@ import json
 from pathlib import Path
 
 from .. import config
-from . import agent_recall
-from .agent_recall import Turn, _clean, _files_from_args, _text, _ts
+from .agent_recall import AgentAdapter, Turn, _clean, _files_from_args, _text, _ts
 
 _NOISE_PREFIXES = ("<session_context>", "<environment_context>")
 
@@ -76,13 +75,11 @@ def parse_session(path: Path) -> list[Turn]:
     return turns
 
 
-def index_gemini(store, sessions_dir: Path | None = None, *,
-                 embedder=None, reindex: bool = False) -> dict:
-    """Incrementally index Gemini CLI sessions. 0 if the directory is absent. Reuses the shared engine.
-    The glob `*/chats/*.jsonl` matches only per-project live sessions (nested checkpoints excluded)."""
-    root = Path(sessions_dir or config.GEMINI_SESSIONS)
-    if not root.exists():
-        return {"turns": 0, "files": 0, "skipped": 0}
-    return agent_recall.index_sessions(store, root.glob("*/chats/*.jsonl"), parse_session,
-                                       embedder=embedder, reindex=reindex,
-                                       agent="gemini", state_prefix="gemini")
+# The glob `*/chats/*.jsonl` matches only per-project live sessions (nested checkpoints excluded).
+ADAPTER = AgentAdapter(
+    name="gemini",
+    default_dir=config.GEMINI_SESSIONS,
+    find_sessions=lambda root: root.glob("*/chats/*.jsonl"),
+    parse=parse_session,
+    state_prefix="gemini",
+)

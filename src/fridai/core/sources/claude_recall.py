@@ -19,7 +19,7 @@ from typing import Iterator
 
 from .. import config
 from . import agent_recall
-from .agent_recall import Turn
+from .agent_recall import AgentAdapter, Turn
 
 _NOISE_PREFIXES = (
     "<command-name>", "<command-message>", "<local-command-stdout>",
@@ -131,13 +131,11 @@ def documents(projects_dir: Path | None = None):
         yield agent_recall.turn_to_document(turn, agent="claude")
 
 
-def index_claude(store, projects_dir: Path | None = None, *,
-                 embedder=None, reindex: bool = False) -> dict:
-    """Index Claude Code conversations incrementally per session file (delegates to the shared engine).
-    state key `agent:<path>` — compatible with existing indexes."""
-    root = Path(projects_dir or config.CLAUDE_PROJECTS)
-    if not root.exists():
-        return {"turns": 0, "files": 0, "skipped": 0}
-    return agent_recall.index_sessions(store, root.rglob("*.jsonl"), parse_session,
-                                       embedder=embedder, reindex=reindex,
-                                       agent="claude", state_prefix="agent")
+# Registered with the shared engine. state_prefix "agent" (not "claude") keeps existing indexes compatible.
+ADAPTER = AgentAdapter(
+    name="claude",
+    default_dir=config.CLAUDE_PROJECTS,
+    find_sessions=lambda root: root.rglob("*.jsonl"),
+    parse=parse_session,
+    state_prefix="agent",
+)
