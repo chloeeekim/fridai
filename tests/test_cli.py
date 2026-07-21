@@ -99,6 +99,40 @@ class TestVersion(unittest.TestCase):
         self.assertIsInstance(cli._pkg_version(), str)
 
 
+class TestMcpConfig(unittest.TestCase):
+    def test_print_config_flag_parsed(self):
+        self.assertTrue(cli.build_parser().parse_args(["mcp", "--print-config"]).print_config)
+        self.assertFalse(cli.build_parser().parse_args(["mcp"]).print_config)
+
+    def test_config_text_covers_every_client(self):
+        txt = cli._mcp_config_text()
+        self.assertIn("claude mcp add fridai", txt)      # Claude Code
+        self.assertIn('"mcpServers"', txt)               # Gemini / generic JSON
+        self.assertIn("[mcp_servers.fridai]", txt)       # Codex TOML
+        self.assertIn('args = ["mcp"]', txt)
+
+    def test_client_filter_shows_only_that_client(self):
+        txt = cli._mcp_config_text("codex")
+        self.assertIn("[mcp_servers.fridai]", txt)       # codex block present
+        self.assertNotIn("claude mcp add", txt)          # others omitted
+        self.assertNotIn('"mcpServers"', txt)
+
+    def test_client_choice_is_validated(self):
+        self.assertEqual(
+            cli.build_parser().parse_args(["mcp", "--print-config", "--client", "gemini"]).client,
+            "gemini")
+        with self.assertRaises(SystemExit):              # unknown client rejected by argparse
+            cli.build_parser().parse_args(["mcp", "--client", "cursor"])
+
+    def test_print_config_prints_and_does_not_serve(self):
+        import contextlib
+        import io
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            cli.cmd_mcp(cli.build_parser().parse_args(["mcp", "--print-config"]))
+        self.assertIn("claude mcp add fridai", buf.getvalue())   # returned without starting stdio server
+
+
 class TestParser(unittest.TestCase):
     def test_watch_defaults(self):
         a = cli.build_parser().parse_args(["index", "--watch"])

@@ -108,6 +108,10 @@ fridai는 표준 **stdio MCP 서버**이고 실행 명령은 `fridai mcp` 입니
 }
 ```
 
+`fridai mcp --print-config` 는 Claude Code·Codex CLI·Gemini CLI 용 등록 스니펫을 바로 붙여넣을 수 있게
+출력합니다 (해석된 절대경로를 사용하므로 `$PATH` 를 상속받지 못하는 GUI 클라이언트에서도 동작합니다).
+`--client claude|gemini|codex` 로 특정 클라이언트만 출력할 수도 있습니다.
+
 ## 연동 에이전트 경로
 
 | 에이전트 | 기본 데이터 경로 | 오버라이드 환경변수 |
