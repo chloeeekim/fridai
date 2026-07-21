@@ -3,6 +3,7 @@
   fridai index [--source all|code|commits|agent] [--path DIR]
   fridai mcp [--print-config [--client claude|gemini|codex]]   # MCP server
   fridai stats
+  fridai note "..."   # save a durable memory note (agents use MCP `remember`)
   fridai forget (--repo NAME | --all)
 No local LLM / answer generation (search & recall only). Embedding via fastembed.
 """
@@ -10,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import shutil
+import sys
 import time
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
@@ -17,7 +19,7 @@ from pathlib import Path
 
 from .core import config, embeddings
 from .core.store import Store
-from .core.sources import agent_recall, code, commits
+from .core.sources import agent_recall, code, commits, notes
 
 
 def _pkg_version() -> str:
@@ -161,6 +163,24 @@ def cmd_stats(args) -> None:
     print("Embedding (semantic):", "ON" if embeddings.get_embedder() else "OFF (lexical search)")
 
 
+def cmd_note(args) -> None:
+    """Save a durable memory note. Agents use the MCP `remember` tool; this is the human/testing path."""
+    if args.repo is not None and args.glob:
+        raise SystemExit("note: --repo and --global are mutually exclusive")
+    text = (args.text if args.text is not None else sys.stdin.read()).strip()
+    if not text:
+        raise SystemExit("note: empty note (pass text as an argument or pipe it via stdin)")
+    store = _open_store(redact=not args.no_redact)
+    embedder = None if args.no_embed else embeddings.get_embedder()
+    try:
+        repo = "" if args.glob else args.repo        # None -> add_note detects the current repo
+        doc = notes.add_note(store, text, repo=repo, embedder=embedder)
+        scope = f"repo '{doc.repo}'" if doc.repo else "all repos (global)"
+        print(f"📝 note saved to {scope} (semantic embedding: {'ON' if embedder else 'OFF'}).")
+    finally:
+        store.close()
+
+
 def cmd_forget(args) -> None:
     """Remove one repo's memory, or reset the whole index (re-buildable with `fridai index`)."""
     if args.all == bool(args.repo):        # neither or both
@@ -235,6 +255,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     st = sub.add_parser("stats", help="index overview")
     st.set_defaults(func=cmd_stats)
+
+    nt = sub.add_parser("note", help="save a durable memory note (agents use the MCP `remember` tool)")
+    nt.add_argument("text", nargs="?", help="note text (omit to read from stdin)")
+    nt.add_argument("--repo", help="attach to this repo (default: the current git repo)")
+    nt.add_argument("--global", dest="glob", action="store_true",
+                    help="don't tie the note to a repo (cross-repo / global)")
+    nt.add_argument("--no-embed", action="store_true", help="skip embedding (lexical only)")
+    nt.add_argument("--no-redact", action="store_true", help="turn off secret redaction (default ON)")
+    nt.set_defaults(func=cmd_note)
 
     fg = sub.add_parser("forget", help="remove one repo's memory, or reset the whole index")
     fg.add_argument("--repo", help="repo name to forget (see `fridai stats` for names)")

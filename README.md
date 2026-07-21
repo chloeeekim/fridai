@@ -6,8 +6,8 @@
 
 *English | [한국어](README.ko.md)*
 
-A lightweight **MCP server** that lets coding agents (Claude Code, etc.) recall your past
-**code, commits, and AI conversations** via the `recall` tool — **100% local**.
+A lightweight **MCP server** that lets coding agents (Claude Code, etc.) `recall` your past
+**code, commits, and AI conversations** — and `remember` durable notes — **100% local**.
 Search & recall only — **no local LLM required.**
 
 - **Search-only (read-only).** The calling agent (an LLM) does the reasoning; fridai
@@ -59,6 +59,7 @@ or `fridai install-hook` to reindex on every git commit (no running process need
 | `fridai index` | Build/update the index. |
 | `fridai mcp` | Run the stdio MCP server. |
 | `fridai stats` | Print document counts by source and by repo, a per-agent conversation breakdown, and when the index was last updated. |
+| `fridai note "..."` | Save a durable memory note (defaults to the current repo; `--global` for cross-repo). Agents do this via the MCP `remember` tool. |
 | `fridai forget` | Remove one repo's memory (`--repo NAME`) or reset the whole index (`--all`). Re-buildable with `fridai index`. |
 | `fridai install-hook` | Install a git post-commit hook that reindexes on each commit. |
 
@@ -75,9 +76,11 @@ or `fridai install-hook` to reindex on every git commit (no running process need
 | `--watch` | Keep reindexing on an interval until Ctrl-C. |
 | `--interval N` | `--watch` poll interval in seconds (default 15). |
 
-## The `recall` tool (MCP)
+## MCP tools
 
-The server exposes one tool, `recall(query, k=5, repo="", source_type="")`:
+The server exposes two tools — `recall` (read) and `remember` (write):
+
+### `recall(query, k=5, repo="", source_type="")`
 
 - `query` — search text (natural language and/or code identifiers).
 - `k` — max results (default 5).
@@ -96,6 +99,15 @@ A: added a bind mount via volumes.
 ### [2] myrepo/docker-compose.yml:1-20
 volumes: ...
 ```
+
+### `remember(text, repo="")`
+
+The write counterpart to `recall`. The agent calls it mid-session to persist a durable note —
+a decision and its rationale, a non-obvious gotcha, or a recurring fix — that a future session
+would want back. `repo` defaults to the current working repo (so `recall` finds it there);
+pass `"<name>"` to pin it elsewhere. Notes are redacted and embedded like any other source.
+
+Humans can write the same notes from the terminal with `fridai note "..."` (see the CLI reference).
 
 Non-Claude sources are tagged (`🤖 codex` / `🤖 gemini` in the CLI, `[codex]`/`[gemini]` in citations).
 

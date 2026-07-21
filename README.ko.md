@@ -6,8 +6,8 @@
 
 *[English](README.md) | 한국어*
 
-코딩 에이전트(Claude Code 등)가 `recall` 툴로 당신의 과거 **코드·커밋·AI 대화 기록**을
-**100% 로컬**에서 회수하게 해주는 경량 **MCP 서버**. 검색·회수 전용 — **로컬 LLM이 필요 없습니다.**
+코딩 에이전트(Claude Code 등)가 당신의 과거 **코드·커밋·AI 대화 기록**을 `recall`로 회수하고
+지속적 노트를 `remember`로 남기게 해주는, **100% 로컬**의 경량 **MCP 서버**. 검색·회수 전용 — **로컬 LLM이 필요 없습니다.**
 
 - **검색 전용(read-only).** 추론은 호출하는 에이전트(LLM)가 하고, fridai는 출처 포함 근거만 회수.
 - **로컬 임베딩(fastembed, onnx).** Ollama·외부 API 불필요. 시맨틱 검색이 기본 동작(fastembed 없으면 어휘 검색 폴백).
@@ -56,6 +56,7 @@ claude mcp add fridai -- fridai mcp   # Claude Code에 등록
 | `fridai index` | 인덱스 생성/갱신. |
 | `fridai mcp` | stdio MCP 서버 실행. |
 | `fridai stats` | 소스별·레포별 문서 수, 에이전트별 대화 분해, 마지막 인덱싱 시각 출력. |
+| `fridai note "..."` | 지속적 기억 노트 저장(기본은 현재 레포, `--global` 로 크로스레포). 에이전트는 MCP `remember` 툴로 수행. |
 | `fridai forget` | 특정 레포 기억 삭제(`--repo NAME`) 또는 인덱스 전체 초기화(`--all`). `fridai index` 로 재생성 가능. |
 | `fridai install-hook` | 커밋마다 재인덱싱하는 git post-commit 훅 설치. |
 
@@ -72,9 +73,11 @@ claude mcp add fridai -- fridai mcp   # Claude Code에 등록
 | `--watch` | Ctrl-C까지 주기적으로 재인덱싱. |
 | `--interval N` | `--watch` 폴링 간격(초, 기본 15). |
 
-## `recall` 툴 (MCP)
+## MCP 툴
 
-서버는 단일 툴 `recall(query, k=5, repo="", source_type="")`을 노출합니다:
+서버는 두 개의 툴 — `recall`(읽기)과 `remember`(쓰기)를 노출합니다:
+
+### `recall(query, k=5, repo="", source_type="")`
 
 - `query` — 검색어(자연어 및/또는 코드 식별자).
 - `k` — 최대 결과 수(기본 5).
@@ -95,6 +98,15 @@ volumes: ...
 ```
 
 비-Claude 소스는 태깅됩니다(CLI에선 `🤖 codex`/`🤖 gemini`, 출처엔 `[codex]`/`[gemini]`).
+
+### `remember(text, repo="")`
+
+`recall`의 짝이 되는 쓰기 툴. 에이전트가 작업 중, 다음 세션에서도 필요할 지속적 기억 — 결정과 그
+이유, 비자명한 함정, 반복되는 문제의 해결책 — 을 남길 때 호출합니다. `repo`는 기본적으로 현재 작업
+레포(그래야 `recall`이 거기서 찾음), `"<이름>"`으로 특정 레포에 고정할 수 있습니다. 노트도 다른 소스와
+동일하게 마스킹·임베딩됩니다.
+
+사람은 터미널에서 `fridai note "..."` 로 같은 노트를 남길 수 있습니다(아래 CLI 레퍼런스 참고).
 
 ## 다른 MCP 클라이언트에 등록
 
