@@ -68,10 +68,13 @@ class TestStore(unittest.TestCase):
         self.assertEqual([d.title for d in docs], ["older", "newer"])
 
     def test_stats(self):
-        self.s.upsert([_doc("a", "x", st="agent_turn"), _doc("b", "y", st="commit")])
+        self.s.upsert([_doc("a", "x", st="agent_turn", repo="r1"),
+                       _doc("b", "y", st="commit", repo="r1"),
+                       _doc("c", "z", st="code", repo="r2")])
         st = self.s.stats()
-        self.assertEqual(st["total"], 2)
+        self.assertEqual(st["total"], 3)
         self.assertEqual(st["by_type"]["commit"], 1)
+        self.assertEqual(st["by_repo"], {"r1": 2, "r2": 1})
 
     def test_stats_by_agent_and_last_indexed(self):
         def turn(title, agent, ts):

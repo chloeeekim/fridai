@@ -133,6 +133,32 @@ class TestMcpConfig(unittest.TestCase):
         self.assertIn("claude mcp add fridai", buf.getvalue())   # returned without starting stdio server
 
 
+class TestStats(unittest.TestCase):
+    def test_stats_prints_by_repo_sorted_desc(self):
+        import contextlib
+        import io
+        from fridai.core import config
+        from fridai.core.models import Document
+        from fridai.core.store import Store
+        s = Store(config.DB_PATH)                          # isolated temp home (tests/__init__)
+        s.reset()
+        s.upsert([
+            Document(id="c1", source_type="code", repo="big", path="a", title="t", text="x"),
+            Document(id="c2", source_type="code", repo="big", path="b", title="t", text="y"),
+            Document(id="c3", source_type="commit", repo="small", path="s", title="t", text="z"),
+        ])
+        s.close()
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            cli.cmd_stats(cli.build_parser().parse_args(["stats"]))
+        out = buf.getvalue()
+        self.assertIn("By repo:", out)
+        self.assertIn("big=2", out)
+        self.assertIn("small=1", out)
+        self.assertLess(out.index("big=2"), out.index("small=1"))   # higher count first
+        Store(config.DB_PATH).reset()                      # leave the shared temp db clean
+
+
 class TestForget(unittest.TestCase):
     def _parse(self, *argv):
         return cli.build_parser().parse_args(["forget", *argv])
