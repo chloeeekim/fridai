@@ -111,6 +111,10 @@ client can use it. For clients that read an `mcpServers` config:
 }
 ```
 
+`fridai mcp --print-config` prints ready-to-paste snippets for Claude Code, Codex CLI, and Gemini CLI
+(using the resolved absolute path, so GUI clients that don't inherit `$PATH` still work). Add
+`--client claude|gemini|codex` to print just one.
+
 ## Indexed agent sources
 
 | Agent | Default data path | Override env var |

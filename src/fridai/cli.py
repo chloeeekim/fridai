@@ -1,13 +1,14 @@
 """fridai CLI (stdlib argparse) — just two things: indexing + running the MCP server.
 
   fridai index [--source all|code|commits|agent] [--path DIR]
-  fridai mcp        # MCP server (agents recall via the recall tool)
+  fridai mcp [--print-config [--client claude|gemini|codex]]   # MCP server
   fridai stats
 No local LLM / answer generation (search & recall only). Embedding via fastembed.
 """
 from __future__ import annotations
 
 import argparse
+import shutil
 import time
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
@@ -97,7 +98,43 @@ def cmd_index(args) -> None:
         store.close()
 
 
+_MCP_CLIENTS = ("claude", "gemini", "codex")
+
+
+def _mcp_config_block(client: str, fridai: str) -> str:
+    """One client's registration snippet."""
+    if client == "claude":
+        return ("▸ Claude Code — run:\n"
+                f"    claude mcp add fridai -- {fridai} mcp")
+    if client == "gemini":
+        return ("▸ Gemini CLI (~/.gemini/settings.json) & generic mcpServers clients:\n"
+                "    {\n"
+                '      "mcpServers": {\n'
+                f'        "fridai": {{ "command": "{fridai}", "args": ["mcp"] }}\n'
+                "      }\n"
+                "    }")
+    if client == "codex":
+        return ("▸ Codex CLI (~/.codex/config.toml):\n"
+                "    [mcp_servers.fridai]\n"
+                f'    command = "{fridai}"\n'
+                '    args = ["mcp"]')
+    raise KeyError(client)
+
+
+def _mcp_config_text(client: str | None = None) -> str:
+    """Ready-to-paste MCP registration snippets. One client if given, else all.
+    Uses the resolved absolute path so GUI clients that don't inherit $PATH still work."""
+    fridai = shutil.which("fridai") or "fridai"
+    clients = [client] if client else list(_MCP_CLIENTS)
+    header = ("fridai stdio MCP server — copy a snippet into your MCP client:\n"
+              f"(launch command: {fridai} mcp)")
+    return "\n\n".join([header, *(_mcp_config_block(c, fridai) for c in clients)])
+
+
 def cmd_mcp(args) -> None:
+    if args.print_config:
+        print(_mcp_config_text(args.client))
+        return
     from . import server
     server.serve()
 
@@ -165,6 +202,10 @@ def build_parser() -> argparse.ArgumentParser:
     ix.set_defaults(func=cmd_index)
 
     mp = sub.add_parser("mcp", help="run the MCP server — agents recall past memory via `recall`")
+    mp.add_argument("--print-config", action="store_true",
+                    help="print ready-to-paste MCP registration snippets and exit (don't start the server)")
+    mp.add_argument("--client", choices=_MCP_CLIENTS,
+                    help="with --print-config, show only this client's snippet (default: all)")
     mp.set_defaults(func=cmd_mcp)
 
     st = sub.add_parser("stats", help="index overview")
