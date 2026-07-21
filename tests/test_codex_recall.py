@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from fridai.core.sources import agent_recall as ar
 from fridai.core.sources import codex_recall as cx
 from fridai.core.store import Store
 
@@ -113,26 +114,25 @@ class TestIndex(unittest.TestCase):
         self.store.close()
 
     def test_indexes_then_skips(self):
-        r1 = cx.index_codex(self.store, self.root)
+        r1 = ar.index_adapter(self.store, cx.ADAPTER, self.root)
         self.assertEqual(r1["files"], 1)
         self.assertEqual(r1["turns"], 2)
-        r2 = cx.index_codex(self.store, self.root)
+        r2 = ar.index_adapter(self.store, cx.ADAPTER, self.root)
         self.assertEqual(r2["skipped"], 1)        # same mtime -> skip
 
     def test_agent_tagged_codex(self):
-        cx.index_codex(self.store, self.root)
+        ar.index_adapter(self.store, cx.ADAPTER, self.root)
         hits = self.store.search_lexical("401", k=5)
         self.assertTrue(hits)
         self.assertEqual(hits[0].document.meta.get("agent"), "codex")
 
     def test_missing_dir(self):
-        self.assertEqual(cx.index_codex(self.store, Path("/no/such/dir")),
+        self.assertEqual(ar.index_adapter(self.store, cx.ADAPTER, Path("/no/such/dir")),
                          {"turns": 0, "files": 0, "skipped": 0})
 
 
 class TestIndexAll(unittest.TestCase):
     def test_aggregates_claude_and_codex(self):
-        from fridai.core.sources import agent_recall as ar
         # one Claude session
         proj = Path(tempfile.mkdtemp())
         with (proj / "s.jsonl").open("w", encoding="utf-8") as f:
@@ -145,7 +145,7 @@ class TestIndexAll(unittest.TestCase):
         gemini_root = Path(tempfile.mkdtemp())           # empty dir -> 0 gemini (real ~/.gemini isolated)
         store = Store(":memory:")
         try:
-            r = ar.index_all(store, proj, codex_root, gemini_root)
+            r = ar.index_all(store, {"claude": proj, "codex": codex_root, "gemini": gemini_root})
             self.assertEqual(r["files"], 2)              # claude 1 + codex 1
             self.assertEqual(r["turns"], 3)              # claude 1 + codex 2
             agents = {h.document.meta.get("agent")

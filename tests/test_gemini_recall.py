@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from fridai.core.sources import agent_recall as ar
 from fridai.core.sources import gemini_recall as gm
 from fridai.core.store import Store
 
@@ -93,13 +94,13 @@ class TestIndex(unittest.TestCase):
         self.store.close()
 
     def test_indexes_then_skips(self):
-        r1 = gm.index_gemini(self.store, self.root)
+        r1 = ar.index_adapter(self.store, gm.ADAPTER, self.root)
         self.assertEqual(r1["files"], 1)
         self.assertEqual(r1["turns"], 2)
-        self.assertEqual(gm.index_gemini(self.store, self.root)["skipped"], 1)
+        self.assertEqual(ar.index_adapter(self.store, gm.ADAPTER, self.root)["skipped"], 1)
 
     def test_agent_tagged_gemini(self):
-        gm.index_gemini(self.store, self.root)
+        ar.index_adapter(self.store, gm.ADAPTER, self.root)
         hits = self.store.search_lexical("프로젝트", k=5)
         self.assertTrue(hits)
         self.assertEqual(hits[0].document.meta.get("agent"), "gemini")
@@ -110,11 +111,11 @@ class TestIndex(unittest.TestCase):
         nested.mkdir()
         (nested / "cp.jsonl").write_text(
             json.dumps(HEADER) + "\n" + json.dumps(MESSAGES[1]) + "\n", encoding="utf-8")
-        r = gm.index_gemini(self.store, self.root)
+        r = ar.index_adapter(self.store, gm.ADAPTER, self.root)
         self.assertEqual(r["files"], 1)          # nested file not counted
 
     def test_missing_dir(self):
-        self.assertEqual(gm.index_gemini(self.store, Path("/no/such/dir")),
+        self.assertEqual(ar.index_adapter(self.store, gm.ADAPTER, Path("/no/such/dir")),
                          {"turns": 0, "files": 0, "skipped": 0})
 
 

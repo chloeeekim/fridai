@@ -20,8 +20,7 @@ import json
 from pathlib import Path
 
 from .. import config
-from . import agent_recall
-from .agent_recall import Turn, _clean, _files_from_args, _text, _ts
+from .agent_recall import AgentAdapter, Turn, _clean, _files_from_args, _text, _ts
 
 _USER_ROLES = {"user"}          # actual user prompts. "developer" (instructions)/"system" excluded as noise.
 # Injected blocks that arrive as role=="user" but aren't real questions (confirmed on real data).
@@ -79,12 +78,10 @@ def parse_session(path: Path) -> list[Turn]:
     return turns
 
 
-def index_codex(store, sessions_dir: Path | None = None, *,
-                embedder=None, reindex: bool = False) -> dict:
-    """Incrementally index Codex CLI sessions. 0 if the directory is absent. Reuses the shared engine."""
-    root = Path(sessions_dir or config.CODEX_SESSIONS)
-    if not root.exists():
-        return {"turns": 0, "files": 0, "skipped": 0}
-    return agent_recall.index_sessions(store, root.rglob("rollout-*.jsonl"), parse_session,
-                                       embedder=embedder, reindex=reindex,
-                                       agent="codex", state_prefix="codex")
+ADAPTER = AgentAdapter(
+    name="codex",
+    default_dir=config.CODEX_SESSIONS,
+    find_sessions=lambda root: root.rglob("rollout-*.jsonl"),
+    parse=parse_session,
+    state_prefix="codex",
+)

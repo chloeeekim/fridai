@@ -7,7 +7,13 @@ Each parser turns session files into a list of `Turn` and reuses the shared mach
   - `link_commits`     : match a question to its resulting commit (time window ∩ touched files)
   - `turn_to_document` : Turn -> indexed Document (records source agent in meta['agent'])
   - `index_sessions`   : mtime-incremental indexing engine over session files (parser callback)
-  - `index_all`        : sum indexing across all registered agents
+  - `AgentAdapter`     : declares one agent source (dir, glob, parser, state key)
+  - `adapters`         : the adapter registry — the single source of truth for known agents
+  - `index_adapter`    : index one agent via its adapter (generic over all agents)
+  - `index_all`        : sum indexing across every registered adapter
+
+Adding a new agent means writing its `parse_session` + one `ADAPTER = AgentAdapter(...)`
+and listing it in `adapters()`; the engine, index_all, and stats stay untouched.
 """
 from __future__ import annotations
 
@@ -17,6 +23,7 @@ import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Callable, Iterable
 
 from .. import config, embeddings
 from ..models import Document, make_id
@@ -199,15 +206,59 @@ def index_sessions(store, files, parse, *, embedder=None, reindex: bool = False,
     return {"turns": turns_total, "files": files_done, "skipped": skipped}
 
 
-def index_all(store, projects_dir: Path | None = None, codex_dir: Path | None = None,
-              gemini_dir: Path | None = None, *, embedder=None, reindex: bool = False) -> dict:
-    """Index and sum conversations across all registered agents (Claude Code + Codex CLI + Gemini CLI).
-    Each source yields 0 if its directory is absent. Called by `index --source agent`."""
+# ── adapter registry: one declarative entry per coding-agent source ──
+@dataclass(frozen=True)
+class AgentAdapter:
+    """Declares one coding-agent conversation source.
+
+    name          : source tag stored in meta['agent'] (e.g. "claude"/"codex"/"gemini")
+    default_dir   : where the agent keeps its sessions (config.*_SESSIONS)
+    find_sessions : enumerate session files under a root (each agent globs differently)
+    parse         : (Path) -> list[Turn], the per-agent parser
+    state_prefix  : index_state key namespace for incremental mtime tracking
+    """
+    name: str
+    default_dir: Path
+    find_sessions: Callable[[Path], Iterable[Path]]
+    parse: Callable[[Path], list[Turn]]
+    state_prefix: str
+
+
+def adapters() -> list[AgentAdapter]:
+    """The registered agent adapters (single source of truth). Import is lazy so the
+    parser modules can import this base module without a cycle."""
     from . import claude_recall, codex_recall, gemini_recall
+    return [claude_recall.ADAPTER, codex_recall.ADAPTER, gemini_recall.ADAPTER]
+
+
+def adapter(name: str) -> AgentAdapter:
+    """Look up a single adapter by agent name (raises KeyError if unknown)."""
+    for a in adapters():
+        if a.name == name:
+            return a
+    raise KeyError(name)
+
+
+def index_adapter(store, adapter: AgentAdapter, sessions_dir: Path | None = None, *,
+                  embedder=None, reindex: bool = False) -> dict:
+    """Index one agent's sessions incrementally via its adapter. Generic over all agents;
+    yields {turns:0, files:0, skipped:0} if the directory is absent."""
+    root = Path(sessions_dir or adapter.default_dir)
+    if not root.exists():
+        return {"turns": 0, "files": 0, "skipped": 0}
+    return index_sessions(store, adapter.find_sessions(root), adapter.parse,
+                          embedder=embedder, reindex=reindex,
+                          agent=adapter.name, state_prefix=adapter.state_prefix)
+
+
+def index_all(store, dirs: dict | None = None, *, embedder=None, reindex: bool = False) -> dict:
+    """Index and sum conversations across every registered adapter.
+    `dirs` optionally overrides a source's directory by agent name (e.g. {"codex": path});
+    a missing/None entry uses the adapter's default. Called by `index --source agent`."""
+    dirs = dirs or {}
     total = {"turns": 0, "files": 0, "skipped": 0}
-    for r in (claude_recall.index_claude(store, projects_dir, embedder=embedder, reindex=reindex),
-              codex_recall.index_codex(store, codex_dir, embedder=embedder, reindex=reindex),
-              gemini_recall.index_gemini(store, gemini_dir, embedder=embedder, reindex=reindex)):
+    for a in adapters():
+        r = index_adapter(store, a, dirs.get(a.name), embedder=embedder, reindex=reindex)
         for k in total:
             total[k] += r[k]
     return total

@@ -124,14 +124,55 @@ class TestIndexSessions(unittest.TestCase):
 
 class TestIndexAll(unittest.TestCase):
     def test_empty_dirs_sum_to_zero(self):
-        # verify it actually imports/calls all three agent modules and sums them (0 if dirs absent)
+        # verify it actually iterates every registered adapter and sums them (0 if dirs absent)
         store = Store(":memory:")
         empty = Path(tempfile.mkdtemp())
         try:
-            r = ar.index_all(store, empty / "a", empty / "b", empty / "c")
+            r = ar.index_all(store, {"claude": empty / "a", "codex": empty / "b",
+                                     "gemini": empty / "c"})
             self.assertEqual(r, {"turns": 0, "files": 0, "skipped": 0})
         finally:
             store.close()
+
+
+class TestAdapterRegistry(unittest.TestCase):
+    def test_registry_lists_known_agents(self):
+        by_name = {a.name: a for a in ar.adapters()}
+        self.assertEqual(set(by_name), {"claude", "codex", "gemini"})
+        # claude keeps state_prefix "agent" for index compatibility; others match their name
+        self.assertEqual(by_name["claude"].state_prefix, "agent")
+        self.assertEqual(by_name["codex"].state_prefix, "codex")
+
+    def test_adapter_lookup_and_unknown(self):
+        self.assertEqual(ar.adapter("gemini").name, "gemini")
+        with self.assertRaises(KeyError):
+            ar.adapter("cursor")
+
+    def test_index_adapter_missing_dir_is_zero(self):
+        store = Store(":memory:")
+        try:
+            r = ar.index_adapter(store, ar.adapter("codex"), Path("/no/such/dir"))
+            self.assertEqual(r, {"turns": 0, "files": 0, "skipped": 0})
+        finally:
+            store.close()
+
+    def test_index_adapter_indexes_and_tags(self):
+        store = Store(":memory:")
+        f = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False)
+        f.write("{}\n"); f.close()
+        # a stub adapter proves index_adapter is fully generic (no per-agent code path)
+        stub = ar.AgentAdapter(
+            name="stub", default_dir=Path(f.name).parent,
+            find_sessions=lambda root: [Path(f.name)],
+            parse=lambda path: [ar.Turn(question="스텁 질문 도커", when=WHEN, repo="r", session_id="s")],
+            state_prefix="stub")
+        try:
+            r = ar.index_adapter(store, stub)
+            self.assertEqual((r["files"], r["turns"]), (1, 1))
+            self.assertEqual(store.search_lexical("도커")[0].document.meta["agent"], "stub")
+        finally:
+            store.close()
+            Path(f.name).unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
