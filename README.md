@@ -169,6 +169,13 @@ enable it with `FRIDAI_REDACT_ENTROPY=1`.
 incomparable even at the same dimension — the store then falls back to lexical search. Reindex
 (`--reindex`) after switching models.
 
+**Non-English content:** the default `nomic-ai/nomic-embed-text-v1.5` is English-centric, so
+semantic recall on other languages (e.g. Korean) is weaker. For multilingual code/conversations,
+point `FRIDAI_FASTEMBED_MODEL` at a multilingual model and reindex — e.g.
+`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (384-dim, small and fast, good
+all-round) or `intfloat/multilingual-e5-large` (1024-dim, higher quality, heavier). After changing
+it, run `fridai index --reindex --source all`.
+
 ## Development
 
 ```bash
