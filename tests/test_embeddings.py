@@ -1,8 +1,8 @@
 """fastembed-only embedder tests (pass even without fastembed installed — fallback/identifier checks)."""
-import os
 import unittest
+from unittest import mock
 
-from fridai.core import embeddings
+from fridai.core import config, embeddings
 from fridai.core.models import Document
 
 
@@ -23,15 +23,8 @@ class FakeBatchEmbedder:
 
 class TestEmbedder(unittest.TestCase):
     def test_backend_none_forces_no_embedder(self):
-        prev = os.environ.get("FRIDAI_EMBED_BACKEND")
-        os.environ["FRIDAI_EMBED_BACKEND"] = "none"
-        try:
+        with mock.patch.object(config, "EMBED_BACKEND", "none"):
             self.assertIsNone(embeddings.get_embedder())
-        finally:                                   # restore so the global isolation value is not cleared
-            if prev is None:
-                os.environ.pop("FRIDAI_EMBED_BACKEND", None)
-            else:
-                os.environ["FRIDAI_EMBED_BACKEND"] = prev
 
     def test_model_id_is_fastembed(self):
         self.assertTrue(embeddings.FastEmbedEmbedder(model="m").model_id.startswith("fastembed:"))

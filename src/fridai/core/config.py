@@ -30,6 +30,12 @@ WORK_PENALTY = int(os.environ.get("FRIDAI_WORK_PENALTY", "8"))
 # Time window (minutes) for matching a question to its resulting commit.
 COMMIT_WINDOW_MIN = int(os.environ.get("FRIDAI_COMMIT_WINDOW_MIN", "180"))
 
+# Embedding (fastembed) settings. FASTEMBED_MODEL must match between indexing and
+# querying — changing it needs a full `fridai index --reindex --source all`.
+# EMBED_BACKEND="none" disables embeddings (lexical-only search).
+FASTEMBED_MODEL = os.environ.get("FRIDAI_FASTEMBED_MODEL", "nomic-ai/nomic-embed-text-v1.5")
+EMBED_BACKEND = os.environ.get("FRIDAI_EMBED_BACKEND", "").lower()
+
 
 def ensure_home() -> Path:
     """Ensure the data-home directory exists and return it."""
