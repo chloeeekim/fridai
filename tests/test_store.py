@@ -143,6 +143,11 @@ class TestStore(unittest.TestCase):
         self.s.set_state("k", "v2")
         self.assertEqual(self.s.get_state("k"), "v2")
 
+    def test_embedder_id_roundtrip(self):
+        self.assertIsNone(self.s.get_embedder_id())
+        self.s.set_embedder_id("fastembed:model-a")
+        self.assertEqual(self.s.get_embedder_id(), "fastembed:model-a")
+
     def test_delete_state(self):
         self.s.set_state("k", "v")
         self.s.delete_state("k")

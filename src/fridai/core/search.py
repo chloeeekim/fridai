@@ -4,9 +4,32 @@ Lexical (BM25) / vector (cosine) / hybrid (RRF) retrieval + source citation + co
 """
 from __future__ import annotations
 
+import sys
+
 from . import config
 from .models import Document, SearchHit
 from .store import Store
+
+_warned_mismatch: set = set()
+
+
+def _embedder_matches(store: Store, embedder) -> bool:
+    """True unless the index was built with a different embedder than the query one.
+
+    Only the vector dimension is enforced deeper in the store; two same-dim models would
+    otherwise return silently-wrong results. On mismatch we warn once (stderr — never stdout,
+    which is the MCP protocol channel) and let the caller fall back to lexical search."""
+    stored = store.get_embedder_id()
+    current = getattr(embedder, "model_id", None)
+    if not stored or not current or stored == current:
+        return True
+    key = (stored, current)
+    if key not in _warned_mismatch:
+        _warned_mismatch.add(key)
+        print(f"fridai: index was built with embedder '{stored}' but the current embedder is "
+              f"'{current}'; falling back to lexical search. Re-run `fridai index --reindex "
+              f"--source all` or set FRIDAI_FASTEMBED_MODEL to match.", file=sys.stderr)
+    return False
 
 
 def citation(doc: Document) -> str:
@@ -120,6 +143,8 @@ def retrieve(store: Store, query: str, k: int = 5, *, embedder=None,
              repo=None, source_type=None, since=None) -> list[SearchHit]:
     """Hybrid (BM25+vector RRF) if embedder given, else lexical. Work-signal rerank + dedup, then top-k."""
     pool = max(k * 3, 15)           # retrieve generously, then trim after rerank/dedup
+    if embedder is not None and not _embedder_matches(store, embedder):
+        embedder = None             # index built with a different model -> avoid wrong-vector hits
     if embedder is not None:
         hits = hybrid_retrieve(store, query, pool, embedder=embedder,
                                repo=repo, source_type=source_type, since=since)

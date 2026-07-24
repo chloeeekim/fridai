@@ -44,6 +44,9 @@ def _run_index(store, source, path, embedder, *, reindex=False, prune=True) -> d
     """Run one indexing pass for the selected source(s). Returns per-source result dicts.
     Incremental (mtime/hash state), so repeated passes are cheap — used by both one-shot and --watch."""
     out: dict = {}
+    _mid = getattr(embedder, "model_id", None)     # record which model built these vectors
+    if _mid:
+        store.set_embedder_id(_mid)
     if source in ("agent", "all"):
         out["agent"] = agent_recall.index_all(store, embedder=embedder, reindex=reindex)
     if source in ("code", "all"):
