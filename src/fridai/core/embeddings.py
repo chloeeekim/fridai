@@ -6,7 +6,7 @@ Disable with `FRIDAI_EMBED_BACKEND=none`. `.model_id` identifies index-query con
 """
 from __future__ import annotations
 
-import os
+from . import config
 
 # fastembed (onnxruntime, no torch). If absent -> None -> lexical (FTS) fallback.
 try:
@@ -14,15 +14,13 @@ try:
 except Exception:
     _FastEmbed = None
 
-_FASTEMBED_MODEL = os.environ.get("FRIDAI_FASTEMBED_MODEL", "nomic-ai/nomic-embed-text-v1.5")
-
 
 class FastEmbedEmbedder:
     """onnx-based local embedder (no external server). Model is lazy-loaded once."""
     _model = None
 
     def __init__(self, model: str | None = None):
-        self.model = model or _FASTEMBED_MODEL
+        self.model = model or config.FASTEMBED_MODEL
 
     @property
     def model_id(self) -> str:
@@ -58,7 +56,7 @@ class FastEmbedEmbedder:
 
 def get_embedder(model: str | None = None):
     """Pick the available embedder. fastembed -> None. Disable with FRIDAI_EMBED_BACKEND=none."""
-    if os.environ.get("FRIDAI_EMBED_BACKEND", "").lower() == "none":
+    if config.EMBED_BACKEND == "none":
         return None
     fe = FastEmbedEmbedder(model)
     return fe if fe.available() else None
