@@ -221,12 +221,14 @@ def cmd_install_hook(args) -> None:
     hook.write_text(
         "#!/bin/sh\n"
         f"{_HOOK_MARKER} — installed by `fridai install-hook`\n"
-        f'fridai index --source {args.source} --path "{repo}" >/dev/null 2>&1 || true\n',
+        # Run detached so `git commit` returns immediately instead of blocking
+        # the terminal until (incremental) reindexing finishes.
+        f'nohup fridai index --source {args.source} --path "{repo}" </dev/null >/dev/null 2>&1 &\n',
         encoding="utf-8",
     )
     hook.chmod(0o755)
     print(f"✅ post-commit hook installed: {hook}")
-    print(f"   `fridai index --source {args.source}` will now run on every commit.")
+    print(f"   `fridai index --source {args.source}` will now run in the background on every commit.")
 
 
 def build_parser() -> argparse.ArgumentParser:

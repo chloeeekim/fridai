@@ -70,6 +70,8 @@ class TestInstallHook(unittest.TestCase):
         self.assertIn(cli._HOOK_MARKER, content)
         self.assertIn(str(self.repo), content)
         self.assertIn("fridai index", content)
+        self.assertIn("nohup", content)                        # detached
+        self.assertTrue(content.rstrip().endswith("&"))        # backgrounded
 
     def test_idempotent_on_own_hook(self):
         self._run(); self._run()                              # own marker present → OK to overwrite
