@@ -1,6 +1,6 @@
 [project]
 name = "fridai"
-version = "0.3.0"
+version = "0.4.0"
 description = "Local MCP server for recalling past code, commits, and AI conversations — search-only, no local LLM required"
 readme = "README.md"
 requires-python = ">=3.10"
