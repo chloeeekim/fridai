@@ -111,6 +111,30 @@ class TestRetrieve(unittest.TestCase):
         self.assertTrue(hits)                          # 0 lexical hits, recalled via vector
         self.assertEqual(hits[0].document.id, "v1")
 
+    def test_retrieve_uses_vector_when_model_matches(self):
+        self.s.upsert([Document(id="v1", source_type="code", repo="r", path="p",
+                                title="t", text="문서 내용", embedding=[1.0, 0.0])])
+        self.s.set_embedder_id("fastembed:A")
+
+        class FakeEmbedder:
+            model_id = "fastembed:A"
+            def embed(self, q):
+                return [1.0, 0.0]
+        hits = search.retrieve(self.s, "무관한단어", k=3, embedder=FakeEmbedder())
+        self.assertEqual(hits[0].document.id, "v1")    # matching model -> vector recall works
+
+    def test_retrieve_falls_back_to_lexical_on_model_mismatch(self):
+        self.s.upsert([Document(id="v1", source_type="code", repo="r", path="p",
+                                title="t", text="문서 내용", embedding=[1.0, 0.0])])
+        self.s.set_embedder_id("fastembed:A")          # index built with model A
+
+        class FakeEmbedder:
+            model_id = "fastembed:B"                    # querying with a different model
+            def embed(self, q):
+                return [1.0, 0.0]
+        hits = search.retrieve(self.s, "무관한단어", k=3, embedder=FakeEmbedder())
+        self.assertFalse(hits)                          # mismatch -> lexical only -> no wrong-vector hit
+
 
 if __name__ == "__main__":
     unittest.main()

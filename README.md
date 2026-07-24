@@ -160,7 +160,7 @@ enable it with `FRIDAI_REDACT_ENTROPY=1`.
 | `FRIDAI_CODEX_SESSIONS` | `~/.codex/sessions` | Codex CLI session location. |
 | `FRIDAI_GEMINI_SESSIONS` | `~/.gemini/tmp` | Gemini CLI session location. |
 | `FRIDAI_EMBED_BACKEND` | auto | `none` disables embeddings (lexical only). |
-| `FRIDAI_FASTEMBED_MODEL` | `nomic-ai/nomic-embed-text-v1.5` | fastembed model name. |
+| `FRIDAI_FASTEMBED_MODEL` | `nomic-ai/nomic-embed-text-v1.5` | fastembed model name. Changing it needs a full `fridai index --reindex --source all`; set it the same for indexing and querying (incl. the MCP server) or recall falls back to lexical. |
 | `FRIDAI_REDACT_ENTROPY` | off | `1` enables the high-entropy secret heuristic. |
 | `FRIDAI_WORK_PENALTY` | `8` | How far to demote pure question turns in ranking. `0` disables. |
 | `FRIDAI_COMMIT_WINDOW_MIN` | `180` | Minutes window for matching a question to its resulting commit. |

@@ -46,5 +46,8 @@ def add_note(store, text: str, *, repo: str | None = None,
     )
     if embedder:
         embeddings.embed_documents([doc], embedder)
+        _mid = getattr(embedder, "model_id", None)  # record which model built this vector
+        if _mid:
+            store.set_embedder_id(_mid)
     store.upsert([doc])
     return doc

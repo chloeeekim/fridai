@@ -322,5 +322,16 @@ class Store:
         self.con.execute("DELETE FROM index_state WHERE key=?", (key,))
         self.con.commit()
 
+    # ── embedder identity (index/query consistency) ──
+    # Records which embedder built the vectors so queries can detect a mismatch
+    # (e.g. FRIDAI_FASTEMBED_MODEL differs between indexing and querying processes).
+    _EMBEDDER_KEY = "meta:embedder_model_id"
+
+    def get_embedder_id(self) -> str | None:
+        return self.get_state(self._EMBEDDER_KEY)
+
+    def set_embedder_id(self, model_id: str) -> None:
+        self.set_state(self._EMBEDDER_KEY, model_id)
+
     def close(self):
         self.con.close()
